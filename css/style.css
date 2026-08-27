@@ -28,6 +28,26 @@ body {
 .app-header h1 { margin: 0 0 6px; font-size: 1.8rem; }
 .app-header p { margin: 0; color: var(--muted); }
 
+.text-size-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.text-size-toggle button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.text-size-toggle button:hover { background: #eef1ec; }
+.text-size-label { color: var(--muted); font-size: 0.85rem; min-width: 3.2em; text-align: center; }
+
 main {
   max-width: 960px;
   margin: 0 auto;
@@ -57,7 +77,11 @@ form { display: flex; flex-direction: column; gap: 16px; }
   background: #fcfcfa;
 }
 .macro-inputs { display: flex; gap: 10px; }
+.macro-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.macro-field-label { font-size: 0.8rem; font-weight: 600; color: var(--ink); }
+.macro-field-label.protein-label { color: #b0b5ad; font-weight: 500; }
 .macro-inputs input { flex: 1; }
+.macro-hint { margin: 4px 0 0; font-size: 0.8rem; color: var(--muted); }
 .checkbox-row { flex-direction: row; align-items: center; gap: 8px; }
 .checkbox-row label { display: flex; align-items: center; gap: 8px; font-weight: 500; }
 
@@ -126,6 +150,9 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .meal-detail ul, .meal-detail ol { margin: 6px 0 0; padding-left: 18px; }
 details summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; font-size: 0.88rem; }
 
+.shopping-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.shopping-head h3 { margin: 0; }
+
 .shopping-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 .shopping-table th, .shopping-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
 .shopping-table tfoot td { border-top: 2px solid var(--border); border-bottom: none; padding-top: 12px; }
@@ -135,4 +162,21 @@ footer code { background: #eee; padding: 2px 6px; border-radius: 4px; }
 
 @media (max-width: 600px) {
   .meal-detail { grid-template-columns: 1fr; }
+}
+
+@media print {
+  body.print-shopping-list .app-header,
+  body.print-shopping-list .panel:not(#results),
+  body.print-shopping-list .results-head,
+  body.print-shopping-list #planMeta,
+  body.print-shopping-list #dayTabs,
+  body.print-shopping-list #dayViews,
+  body.print-shopping-list #printListBtn,
+  body.print-shopping-list footer {
+    display: none !important;
+  }
+  body.print-shopping-list #results {
+    border: none;
+    padding: 0;
+  }
 }

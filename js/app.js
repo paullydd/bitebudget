@@ -1,7 +1,65 @@
-const STORAGE_KEY = "mealBudgetPlanner.settings.v1";
-const PLAN_KEY = "mealBudgetPlanner.plan.v1";
+const STORAGE_KEY = "biteBudget.settings.v1";
+const PLAN_KEY = "biteBudget.plan.v1";
+const FONT_SCALE_KEY = "biteBudget.fontScale.v1";
+const FONT_SCALES = [90, 100, 112, 125, 140];
 
 const $ = (sel) => document.querySelector(sel);
+
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+function applyFontScale(pct) {
+  document.documentElement.style.fontSize = pct + "%";
+  $("#textSizeLabel").textContent = pct + "%";
+  localStorage.setItem(FONT_SCALE_KEY, String(pct));
+}
+
+function initFontScale() {
+  const saved = Number(localStorage.getItem(FONT_SCALE_KEY));
+  let index = FONT_SCALES.indexOf(saved);
+  if (index === -1) index = FONT_SCALES.indexOf(100);
+  applyFontScale(FONT_SCALES[index]);
+
+  $("#textSizeDown").addEventListener("click", () => {
+    index = Math.max(0, index - 1);
+    applyFontScale(FONT_SCALES[index]);
+  });
+  $("#textSizeUp").addEventListener("click", () => {
+    index = Math.min(FONT_SCALES.length - 1, index + 1);
+    applyFontScale(FONT_SCALES[index]);
+  });
+}
+
+// Keeps protein/carbs/fat locked to a 100% total. Protein is the anchor field
+// (styled gray in the UI) — editing it redistributes carbs/fat proportionally
+// to fill the remainder. Editing carbs or fat keeps protein fixed and solves
+// the third field so the three always sum to exactly 100.
+function balanceMacros(changed) {
+  let p = clamp(Math.round(Number($("#macroProtein").value) || 0), 0, 100);
+  let c = Math.round(Number($("#macroCarbs").value) || 0);
+  let f = Math.round(Number($("#macroFat").value) || 0);
+
+  if (changed === "protein") {
+    const remaining = 100 - p;
+    const curSum = c + f;
+    if (curSum <= 0) {
+      c = Math.round(remaining / 2);
+      f = remaining - c;
+    } else {
+      c = Math.round((remaining * c) / curSum);
+      f = remaining - c;
+    }
+  } else if (changed === "carbs") {
+    c = clamp(c, 0, 100 - p);
+    f = 100 - p - c;
+  } else if (changed === "fat") {
+    f = clamp(f, 0, 100 - p);
+    c = 100 - p - f;
+  }
+
+  $("#macroProtein").value = p;
+  $("#macroCarbs").value = c;
+  $("#macroFat").value = f;
+}
 
 function readSettings() {
   return {
@@ -161,6 +219,8 @@ function activateDay(dayNum) {
 }
 
 function init() {
+  initFontScale();
+
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) writeSettingsToForm(JSON.parse(saved));
 
@@ -187,6 +247,19 @@ function init() {
   $("#dayTabs").addEventListener("click", (e) => {
     if (e.target.matches(".day-tab")) activateDay(Number(e.target.dataset.day));
   });
+
+  $("#printListBtn").addEventListener("click", () => {
+    document.body.classList.add("print-shopping-list");
+    window.print();
+  });
+  window.addEventListener("afterprint", () => {
+    document.body.classList.remove("print-shopping-list");
+  });
+
+  $("#macroProtein").addEventListener("input", () => balanceMacros("protein"));
+  $("#macroCarbs").addEventListener("input", () => balanceMacros("carbs"));
+  $("#macroFat").addEventListener("input", () => balanceMacros("fat"));
+  balanceMacros("protein"); // ensure whatever loaded from storage/defaults sums to 100
 }
 
 document.addEventListener("DOMContentLoaded", init);

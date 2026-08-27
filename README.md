@@ -1,4 +1,4 @@
-# Meal & Budget Planner
+# BiteBudget
 
 A lightweight, dependency-free web app that generates a varied, calorie- and
 macro-tracked meal plan (breakfast/lunch/dinner/snacks) that fits a grocery
@@ -25,6 +25,13 @@ that runs in any modern browser.
   one list with quantities and total estimated cost.
 - **Vegetarian filter** and a "shuffle" button to regenerate with more
   variety without changing your settings.
+- **Adjustable text size** — A−/A+ controls in the header scale the whole
+  UI (90%–140%), remembered across visits, for readability across ages.
+- **Printable shopping list** — a dedicated print button formats just the
+  shopping list for a physical copy to take to the store.
+- **Installable (PWA)** — has a manifest and service worker so it can be
+  added to a phone/desktop home screen and used offline after the first
+  visit.
 
 ## Running it
 
@@ -83,8 +90,11 @@ you:
 ## Project structure
 
 ```
-meal-budget-planner/
+bitebudget/
 ├── index.html          # UI markup
+├── manifest.json        # PWA install metadata
+├── sw.js                 # Service worker (offline app-shell caching)
+├── icons/                # App icons (source SVGs + rasterized PNGs)
 ├── css/style.css        # Styling
 ├── js/foods.js          # Nutrition + price database (per 100g)
 ├── js/meals.js           # Meal templates (ingredients + instructions)

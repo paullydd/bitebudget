@@ -3,12 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Meal &amp; Budget Planner</title>
+<title>BiteBudget</title>
+<meta name="description" content="Plan varied, calorie- and macro-tracked meals that fit your grocery budget.">
+<meta name="theme-color" content="#3f7d5c">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BiteBudget">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="app-header">
-    <h1>🥘 Meal &amp; Budget Planner</h1>
+    <div class="text-size-toggle" role="group" aria-label="Text size">
+      <button type="button" id="textSizeDown" aria-label="Decrease text size">A−</button>
+      <span id="textSizeLabel" class="text-size-label">100%</span>
+      <button type="button" id="textSizeUp" aria-label="Increase text size">A+</button>
+    </div>
+    <h1>🥘 BiteBudget</h1>
     <p>Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
   </header>
 
@@ -27,12 +40,22 @@
         </div>
 
         <div class="form-row macro-row">
-          <label>Macro split (%) — protein / carbs / fat</label>
+          <label>Macro split — locked to 100% total</label>
           <div class="macro-inputs">
-            <input type="number" id="macroProtein" min="0" max="100" value="30" required>
-            <input type="number" id="macroCarbs" min="0" max="100" value="40" required>
-            <input type="number" id="macroFat" min="0" max="100" value="30" required>
+            <div class="macro-field">
+              <span class="macro-field-label protein-label">Protein %</span>
+              <input type="number" id="macroProtein" min="0" max="100" value="30" required>
+            </div>
+            <div class="macro-field">
+              <span class="macro-field-label">Carbs %</span>
+              <input type="number" id="macroCarbs" min="0" max="100" value="40" required>
+            </div>
+            <div class="macro-field">
+              <span class="macro-field-label">Fat %</span>
+              <input type="number" id="macroFat" min="0" max="100" value="30" required>
+            </div>
           </div>
+          <p class="macro-hint">Carbs and fat auto-adjust so the three always total 100% — you can't go over.</p>
         </div>
 
         <div class="form-row">
@@ -76,18 +99,28 @@
       <div id="dayTabs" class="day-tabs"></div>
       <div id="dayViews"></div>
 
-      <h3>Weekly Shopping List</h3>
+      <div class="shopping-head">
+        <h3>Weekly Shopping List</h3>
+        <button type="button" id="printListBtn" class="secondary-btn">🖨️ Print Shopping List</button>
+      </div>
       <div id="shoppingList"></div>
     </section>
   </main>
 
   <footer>
-    <p>Grocery prices are national averages, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>
+    <p>BiteBudget uses national-average grocery prices, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>
   </footer>
 
   <script src="js/foods.js"></script>
   <script src="js/meals.js"></script>
   <script src="js/planner.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

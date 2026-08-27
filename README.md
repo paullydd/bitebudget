@@ -32,6 +32,15 @@ that runs in any modern browser.
 - **Installable (PWA)** — has a manifest and service worker so it can be
   added to a phone/desktop home screen and used offline after the first
   visit.
+- **Budget feasibility warning** — warns *before* you generate a plan if
+  your budget can't realistically cover even the cheapest meals at your
+  calorie target, and over-budget results now include a concrete suggestion
+  (raise the budget to $X, or try Vegetarian only) instead of just red text.
+- **Taste-preference onboarding** — a skippable, Spotify-style first-run
+  wizard (liked proteins → meal style per meal → your all-time go-to meal)
+  that biases meal selection toward what you actually eat, without turning
+  into a hard filter — variety is still preserved. Revisit anytime via the
+  "🎯 Preferences" button in the header.
 
 ## Running it
 
@@ -69,23 +78,32 @@ you:
 
 - **`js/foods.js`** — edit `price` (USD per 100g) for any food to match your
   local store. Add new foods here (with `cal`, `protein`, `carbs`, `fat`,
-  `price`, `veg`).
+  `price`, `veg`, and optionally `proteinFamily` — see below).
 - **`js/meals.js`** — add or edit meal templates. Each references foods from
-  `foods.js` by key, with a base gram amount and instructions. The planner
-  automatically scales portions up/down to hit calorie targets.
+  `foods.js` by key, with a base gram amount, instructions, and a `style` tag
+  used by the preference system. The planner automatically scales portions
+  up/down to hit calorie targets.
 
 ## How the planner works (`js/planner.js`)
 
 1. Splits your daily calorie target across meal slots (breakfast 25%, lunch
    30%, dinner 35%, snacks 10% split across however many you chose).
-2. For each slot, picks a template you haven't had in the last 3 days,
-   scales its ingredient quantities toward the slot's calorie target (bounded
-   to 0.7x–1.4x so portions stay realistic), and computes nutrition + cost.
-3. Tracks running cost against your daily budget; if you're pacing over
-   budget, it biases future picks toward the cheaper half of eligible
-   templates for that slot.
+2. For each slot, filters to templates you haven't had in the last 3 days,
+   then to the cheaper half of those when you're pacing over budget, then
+   picks a *weighted* random choice from what's left — templates matching
+   your saved taste preferences (liked proteins, preferred meal style, your
+   signature meal) get a higher weight, but everything can still appear.
+   Skipping the preference wizard means every weight is equal, which is
+   mathematically identical to a plain uniform pick.
+3. Scales the chosen template's ingredient quantities toward the slot's
+   calorie target (bounded to 0.7x–1.4x so portions stay realistic), and
+   computes nutrition + cost.
 4. Aggregates every ingredient across the whole plan into a shopping list
    with a total cost estimate.
+
+`estimateMinDailyCost()` in the same file computes a realistic best-case
+daily cost (cheapest eligible template per slot, same scaling bounds) — this
+is what powers the budget feasibility warning.
 
 ## Project structure
 

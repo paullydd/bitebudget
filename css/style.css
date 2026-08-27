@@ -78,7 +78,16 @@ body {
 }
 .welcome-icon { font-size: 3.2rem; line-height: 1; }
 .welcome-title { margin: 4px 0 0; font-size: 2rem; }
-.welcome-tagline { color: var(--muted); margin: 0 0 20px; max-width: 32em; }
+.welcome-tagline { color: var(--muted); margin: 0 0 8px; max-width: 32em; }
+.welcome-quote {
+  font-style: italic;
+  color: var(--accent-dark);
+  min-height: 1.4em;
+  margin: 0 0 20px;
+  max-width: 30em;
+  transition: opacity 0.3s ease;
+}
+.welcome-quote.fade-out { opacity: 0; }
 .welcome-cta { padding: 14px 32px; font-size: 1.05rem; margin-bottom: 6px; }
 
 /* ---------- Onboarding wizard ---------- */
@@ -185,6 +194,23 @@ main {
 .hidden { display: none; }
 
 form { display: flex; flex-direction: column; gap: 16px; }
+
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #fbfaf6;
+}
+.settings-section summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+.settings-section summary:hover { color: var(--accent-dark); }
+.settings-section[open] summary { margin-bottom: 14px; }
+.settings-section-body { display: flex; flex-direction: column; gap: 16px; }
+
 .form-row { display: flex; flex-direction: column; gap: 6px; }
 .form-row label { font-weight: 600; font-size: 0.92rem; }
 .form-row input, .form-row select {

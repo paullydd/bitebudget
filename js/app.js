@@ -11,6 +11,15 @@ const BUDGET_SLIDER_RANGES = {
   weekly: { min: 20, max: 700, step: 5 }, // step divides 55 (75 - min) so the $75 default lands exactly on a step
   monthly: { min: 75, max: 2500, step: 25 },
 };
+const WELCOME_QUOTES = [
+  "Eating well shouldn't require winning the lottery.",
+  "Your wallet called — it wants snacks too.",
+  "Ramen has feelings. Let's diversify.",
+  "Budgets are just spicy math.",
+  "Groceries: the original subscription service.",
+  "Home cooking: 10% skill, 90% not wasting the cilantro.",
+  "A balanced diet is a cookie in each hand — we can do better.",
+];
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -136,8 +145,31 @@ function goToWizardStep(n) {
   $("#wizardNext").textContent = n === WIZARD_TOTAL_STEPS ? "Finish" : "Next";
 }
 
+let quoteRotationTimer = null;
+
+function startQuoteRotation() {
+  const el = $("#welcomeQuote");
+  if (!el) return;
+  let index = Math.floor(Math.random() * WELCOME_QUOTES.length);
+  el.textContent = WELCOME_QUOTES[index];
+  quoteRotationTimer = setInterval(() => {
+    index = (index + 1) % WELCOME_QUOTES.length;
+    el.classList.add("fade-out");
+    setTimeout(() => {
+      el.textContent = WELCOME_QUOTES[index];
+      el.classList.remove("fade-out");
+    }, 300);
+  }, 3500);
+}
+
+function stopQuoteRotation() {
+  clearInterval(quoteRotationTimer);
+  quoteRotationTimer = null;
+}
+
 function hideWelcome() {
   $("#welcomeScreen").classList.add("hidden");
+  stopQuoteRotation();
 }
 
 function showOnboarding() {
@@ -298,8 +330,10 @@ function initOnboarding() {
   if (localStorage.getItem(ONBOARDED_KEY)) {
     hideWelcome();
     hideOnboarding();
+  } else {
+    // Welcome screen is visible by default in the markup — just start its quote rotation.
+    startQuoteRotation();
   }
-  // else: the welcome screen is visible by default in the markup — nothing to do.
 }
 
 function readSettings() {

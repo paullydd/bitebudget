@@ -36,8 +36,9 @@ that runs in any modern browser.
   your budget can't realistically cover even the cheapest meals at your
   calorie target, and over-budget results now include a concrete suggestion
   (raise the budget to $X, or try Vegetarian only) instead of just red text.
-- **Taste-preference onboarding** — a welcome screen with "Get Started" /
-  "Skip setup for now" leads into a skippable, Spotify-style wizard: liked
+- **Taste-preference onboarding** — a welcome screen (name, tagline, a
+  rotating funny quote, "Get Started" / "Skip setup for now") leads into a
+  skippable, Spotify-style wizard: liked
   *and disliked* proteins (tap a protein once to like it, again to say "not
   for me," a third time to clear it) → meal style per meal → your calorie
   target → your grocery budget → your all-time go-to meal. Likes and
@@ -48,6 +49,9 @@ that runs in any modern browser.
   with a slider or typed directly, in both the onboarding wizard and the
   Settings panel; the budget slider's range adapts to whichever period
   (daily/weekly/monthly) is selected.
+- **Collapsible Settings** — the Settings panel is split into "Plan basics"
+  (open by default) and "Advanced" (macros, vegetarian — collapsed by
+  default) so the everyday page stays short even with both sliders in it.
 
 ## Running it
 

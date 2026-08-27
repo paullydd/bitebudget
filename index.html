@@ -33,6 +33,7 @@
       <div class="welcome-icon">🥘</div>
       <h1 class="welcome-title">BiteBudget</h1>
       <p class="welcome-tagline">Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
+      <p id="welcomeQuote" class="welcome-quote"></p>
       <button type="button" id="getStartedBtn" class="primary-btn welcome-cta">Get Started</button>
       <button type="button" id="welcomeSkip" class="text-link-btn">Skip setup for now</button>
     </section>
@@ -156,68 +157,78 @@
     <section id="settingsPanel" class="panel hidden">
       <h2>Settings</h2>
       <form id="planForm">
-        <div class="form-row">
-          <label for="days">Plan length (days)</label>
-          <input type="number" id="days" min="1" max="14" value="7" required>
-        </div>
-
-        <div class="form-row">
-          <label for="calories">Daily calorie target</label>
-          <div class="slider-row">
-            <input type="range" id="caloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
-            <input type="number" id="calories" min="1000" max="5000" step="50" value="2000" required>
-          </div>
-        </div>
-
-        <div class="form-row macro-row">
-          <label>Macro split — locked to 100% total</label>
-          <div class="macro-inputs">
-            <div class="macro-field">
-              <span class="macro-field-label protein-label">Protein %</span>
-              <input type="number" id="macroProtein" min="0" max="100" value="30" required>
+        <details class="settings-section" open>
+          <summary>Plan basics</summary>
+          <div class="settings-section-body">
+            <div class="form-row">
+              <label for="days">Plan length (days)</label>
+              <input type="number" id="days" min="1" max="14" value="7" required>
             </div>
-            <div class="macro-field">
-              <span class="macro-field-label">Carbs %</span>
-              <input type="number" id="macroCarbs" min="0" max="100" value="40" required>
+
+            <div class="form-row">
+              <label for="calories">Daily calorie target</label>
+              <div class="slider-row">
+                <input type="range" id="caloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
+                <input type="number" id="calories" min="1000" max="5000" step="50" value="2000" required>
+              </div>
             </div>
-            <div class="macro-field">
-              <span class="macro-field-label">Fat %</span>
-              <input type="number" id="macroFat" min="0" max="100" value="30" required>
+
+            <div class="form-row">
+              <label for="snacks">Snacks per day</label>
+              <select id="snacks">
+                <option value="1">1</option>
+                <option value="2" selected>2</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label for="budgetPeriod">Grocery budget period</label>
+              <select id="budgetPeriod">
+                <option value="daily">Daily</option>
+                <option value="weekly" selected>Weekly</option>
+                <option value="monthly">Monthly</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label for="budgetAmount">Budget amount ($)</label>
+              <div class="slider-row">
+                <input type="range" id="budgetAmountSlider" min="20" max="700" step="5" value="75" aria-label="Budget amount">
+                <input type="number" id="budgetAmount" min="20" max="700" step="5" value="75" required>
+              </div>
+            </div>
+
+            <div id="budgetWarning" class="warning-banner hidden"></div>
+          </div>
+        </details>
+
+        <details class="settings-section">
+          <summary>Advanced (macros &amp; diet)</summary>
+          <div class="settings-section-body">
+            <div class="form-row macro-row">
+              <label>Macro split — locked to 100% total</label>
+              <div class="macro-inputs">
+                <div class="macro-field">
+                  <span class="macro-field-label protein-label">Protein %</span>
+                  <input type="number" id="macroProtein" min="0" max="100" value="30" required>
+                </div>
+                <div class="macro-field">
+                  <span class="macro-field-label">Carbs %</span>
+                  <input type="number" id="macroCarbs" min="0" max="100" value="40" required>
+                </div>
+                <div class="macro-field">
+                  <span class="macro-field-label">Fat %</span>
+                  <input type="number" id="macroFat" min="0" max="100" value="30" required>
+                </div>
+              </div>
+              <p class="macro-hint">Carbs and fat auto-adjust so the three always total 100% — you can't go over.</p>
+            </div>
+
+            <div class="form-row checkbox-row">
+              <label><input type="checkbox" id="vegetarian"> Vegetarian only</label>
             </div>
           </div>
-          <p class="macro-hint">Carbs and fat auto-adjust so the three always total 100% — you can't go over.</p>
-        </div>
-
-        <div class="form-row">
-          <label for="snacks">Snacks per day</label>
-          <select id="snacks">
-            <option value="1">1</option>
-            <option value="2" selected>2</option>
-          </select>
-        </div>
-
-        <div class="form-row">
-          <label for="budgetPeriod">Grocery budget period</label>
-          <select id="budgetPeriod">
-            <option value="daily">Daily</option>
-            <option value="weekly" selected>Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-
-        <div class="form-row">
-          <label for="budgetAmount">Budget amount ($)</label>
-          <div class="slider-row">
-            <input type="range" id="budgetAmountSlider" min="20" max="700" step="5" value="75" aria-label="Budget amount">
-            <input type="number" id="budgetAmount" min="20" max="700" step="5" value="75" required>
-          </div>
-        </div>
-
-        <div id="budgetWarning" class="warning-banner hidden"></div>
-
-        <div class="form-row checkbox-row">
-          <label><input type="checkbox" id="vegetarian"> Vegetarian only</label>
-        </div>
+        </details>
 
         <button type="submit" class="primary-btn">Generate Plan</button>
       </form>

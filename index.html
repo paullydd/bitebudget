@@ -29,15 +29,23 @@
   </header>
 
   <main>
-    <section id="onboarding" class="panel">
-      <h2>🍽️ What do you like to eat?</h2>
-      <p class="onboarding-intro">Three quick questions — broad first, then more specific, then your all-time go-to. This only nudges variety toward your taste; it never restricts your plan, and you can change it anytime from "Preferences."</p>
+    <section id="welcomeScreen" class="panel welcome-screen">
+      <div class="welcome-icon">🥘</div>
+      <h1 class="welcome-title">BiteBudget</h1>
+      <p class="welcome-tagline">Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
+      <button type="button" id="getStartedBtn" class="primary-btn welcome-cta">Get Started</button>
+      <button type="button" id="welcomeSkip" class="text-link-btn">Skip setup for now</button>
+    </section>
 
-      <div class="wizard-progress" id="wizardProgress">Step 1 of 3</div>
+    <section id="onboarding" class="panel hidden">
+      <h2>🍽️ What do you like to eat?</h2>
+      <p class="onboarding-intro">A few quick questions — broad first, then more specific, then your all-time go-to, plus your calorie and budget targets. This only nudges variety toward your taste; it never restricts your plan, and you can change it anytime from "Preferences."</p>
+
+      <div class="wizard-progress" id="wizardProgress">Step 1 of 5</div>
 
       <div class="wizard-step active" data-step="1">
         <h3>What proteins do you like?</h3>
-        <p class="wizard-hint">Pick as many as you want.</p>
+        <p class="wizard-hint">Tap once to like 👍, tap again to say "not for me" 👎, tap a third time to clear it.</p>
         <div class="bubble-group" id="proteinBubbles">
           <button type="button" class="bubble" data-value="red_meat">🥩 Red meat</button>
           <button type="button" class="bubble" data-value="poultry">🍗 Poultry</button>
@@ -113,6 +121,29 @@
         </div>
       </div>
 
+      <div class="wizard-step" data-step="4">
+        <h3>How many calories per day?</h3>
+        <p class="wizard-hint">Slide or type — you can fine-tune this anytime in Settings.</p>
+        <div class="slider-row">
+          <input type="range" id="obCaloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
+          <input type="number" id="obCalories" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target (typed)">
+        </div>
+      </div>
+
+      <div class="wizard-step" data-step="5">
+        <h3>What's your grocery budget?</h3>
+        <p class="wizard-hint">Pick a period, then slide or type an amount.</p>
+        <div class="bubble-group" id="obBudgetPeriod">
+          <button type="button" class="bubble" data-value="daily">Daily</button>
+          <button type="button" class="bubble selected" data-value="weekly">Weekly</button>
+          <button type="button" class="bubble" data-value="monthly">Monthly</button>
+        </div>
+        <div class="slider-row">
+          <input type="range" id="obBudgetAmountSlider" min="20" max="700" step="5" value="75" aria-label="Budget amount">
+          <input type="number" id="obBudgetAmount" min="20" max="700" step="5" value="75" aria-label="Budget amount (typed)">
+        </div>
+      </div>
+
       <div class="wizard-nav">
         <button type="button" id="wizardSkip" class="text-link-btn">Skip for now</button>
         <div class="wizard-nav-buttons">
@@ -132,7 +163,10 @@
 
         <div class="form-row">
           <label for="calories">Daily calorie target</label>
-          <input type="number" id="calories" min="1000" max="5000" step="50" value="2000" required>
+          <div class="slider-row">
+            <input type="range" id="caloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
+            <input type="number" id="calories" min="1000" max="5000" step="50" value="2000" required>
+          </div>
         </div>
 
         <div class="form-row macro-row">
@@ -173,7 +207,10 @@
 
         <div class="form-row">
           <label for="budgetAmount">Budget amount ($)</label>
-          <input type="number" id="budgetAmount" min="1" step="1" value="75" required>
+          <div class="slider-row">
+            <input type="range" id="budgetAmountSlider" min="20" max="700" step="5" value="75" aria-label="Budget amount">
+            <input type="number" id="budgetAmount" min="20" max="700" step="5" value="75" required>
+          </div>
         </div>
 
         <div id="budgetWarning" class="warning-banner hidden"></div>

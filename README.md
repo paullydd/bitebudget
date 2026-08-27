@@ -36,11 +36,18 @@ that runs in any modern browser.
   your budget can't realistically cover even the cheapest meals at your
   calorie target, and over-budget results now include a concrete suggestion
   (raise the budget to $X, or try Vegetarian only) instead of just red text.
-- **Taste-preference onboarding** — a skippable, Spotify-style first-run
-  wizard (liked proteins → meal style per meal → your all-time go-to meal)
-  that biases meal selection toward what you actually eat, without turning
-  into a hard filter — variety is still preserved. Revisit anytime via the
-  "🎯 Preferences" button in the header.
+- **Taste-preference onboarding** — a welcome screen with "Get Started" /
+  "Skip setup for now" leads into a skippable, Spotify-style wizard: liked
+  *and disliked* proteins (tap a protein once to like it, again to say "not
+  for me," a third time to clear it) → meal style per meal → your calorie
+  target → your grocery budget → your all-time go-to meal. Likes and
+  dislikes both bias meal selection (dislikes strongly, but never to a hard
+  ban) without turning into a filter — variety is still preserved. Revisit
+  anytime via the "🎯 Preferences" button in the header.
+- **Slide-or-type controls** — calorie target and budget amount can be set
+  with a slider or typed directly, in both the onboarding wizard and the
+  Settings panel; the budget slider's range adapts to whichever period
+  (daily/weekly/monthly) is selected.
 
 ## Running it
 
@@ -95,9 +102,10 @@ you:
    then to the cheaper half of those when you're pacing over budget, then
    picks a *weighted* random choice from what's left — templates matching
    your saved taste preferences (liked proteins, preferred meal style, your
-   signature meal) get a higher weight, but everything can still appear.
-   Skipping the preference wizard means every weight is equal, which is
-   mathematically identical to a plain uniform pick.
+   signature meal) get a higher weight, and templates matching a *disliked*
+   protein get a strong penalty (rare, never zero) — but everything can
+   still appear. Skipping the preference wizard means every weight is equal,
+   which is mathematically identical to a plain uniform pick.
 3. Scales the chosen template's ingredient quantities toward the slot's
    calorie target (bounded to 0.7x–1.4x so portions stay realistic), and
    computes nutrition + cost.
@@ -135,3 +143,5 @@ bitebudget/
   Node/Express or Python/Flask API) if you want multi-device sync.
 - Add a "log what I actually ate" mode for real MyFitnessPal-style daily
   tracking against the plan.
+- Derive the calorie target from body weight and a stated goal (lose/
+  maintain/gain), instead of the user picking a raw calorie number directly.

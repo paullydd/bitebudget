@@ -4,8 +4,13 @@ const FONT_SCALE_KEY = "biteBudget.fontScale.v1";
 const FONT_SCALES = [90, 100, 112, 125, 140];
 const PREFS_KEY = "biteBudget.preferences.v1";
 const ONBOARDED_KEY = "biteBudget.onboarded.v1";
-const WIZARD_TOTAL_STEPS = 3;
+const WIZARD_TOTAL_STEPS = 5;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
+const BUDGET_SLIDER_RANGES = {
+  daily: { min: 5, max: 150, step: 5 },
+  weekly: { min: 20, max: 700, step: 5 }, // step divides 55 (75 - min) so the $75 default lands exactly on a step
+  monthly: { min: 75, max: 2500, step: 25 },
+};
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -65,14 +70,56 @@ function balanceMacros(changed) {
   $("#macroFat").value = f;
 }
 
+// Keeps a <input type=range> and <input type=number> showing the same value.
+// The number input stays the single source of truth everything else reads —
+// dragging the slider just types into it (via a synthetic input event) so
+// every listener already on the number input keeps working untouched.
+function syncSlider(numberSel, rangeSel) {
+  const numberEl = $(numberSel), rangeEl = $(rangeSel);
+  rangeEl.min = numberEl.min;
+  rangeEl.max = numberEl.max;
+  rangeEl.step = numberEl.step;
+  rangeEl.value = numberEl.value;
+  numberEl.value = rangeEl.value; // range inputs snap to the nearest step on assignment; match that
+  rangeEl.addEventListener("input", () => {
+    numberEl.value = rangeEl.value;
+    numberEl.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  numberEl.addEventListener("input", () => {
+    rangeEl.value = numberEl.value;
+  });
+}
+
+// Applies the budget slider's period-dependent min/max/step to both the
+// range and number input, clamping the current value into the new bounds.
+function applyBudgetSliderRange(rangeSel, numberSel, period) {
+  const range = BUDGET_SLIDER_RANGES[period] || BUDGET_SLIDER_RANGES.weekly;
+  const rangeEl = $(rangeSel), numberEl = $(numberSel);
+  rangeEl.min = numberEl.min = range.min;
+  rangeEl.max = numberEl.max = range.max;
+  rangeEl.step = numberEl.step = range.step;
+  const clamped = clamp(Number(numberEl.value) || range.min, range.min, range.max);
+  rangeEl.value = clamped; // range inputs snap to the nearest step on assignment
+  numberEl.value = rangeEl.value; // read back the snapped value so both controls agree exactly
+}
+
 let wizardStep = 1;
 
-function wireBubbleGroup(container, multi) {
+function wireBubbleGroup(container, mode) {
   container.addEventListener("click", (e) => {
     const btn = e.target.closest(".bubble");
     if (!btn) return;
-    if (multi) {
+    if (mode === "multi") {
       btn.classList.toggle("selected");
+    } else if (mode === "tristate") {
+      if (btn.classList.contains("selected")) {
+        btn.classList.remove("selected");
+        btn.classList.add("disliked");
+      } else if (btn.classList.contains("disliked")) {
+        btn.classList.remove("disliked");
+      } else {
+        btn.classList.add("selected");
+      }
     } else {
       [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
     }
@@ -89,7 +136,12 @@ function goToWizardStep(n) {
   $("#wizardNext").textContent = n === WIZARD_TOTAL_STEPS ? "Finish" : "Next";
 }
 
+function hideWelcome() {
+  $("#welcomeScreen").classList.add("hidden");
+}
+
 function showOnboarding() {
+  hideWelcome();
   goToWizardStep(1);
   $("#onboarding").classList.remove("hidden");
   $("#settingsPanel").classList.add("hidden");
@@ -101,38 +153,55 @@ function hideOnboarding() {
 }
 
 function clearBubbleSelections() {
-  document.querySelectorAll(".bubble.selected").forEach(b => b.classList.remove("selected"));
+  document.querySelectorAll(".bubble.selected, .bubble.disliked").forEach(b => b.classList.remove("selected", "disliked"));
 }
 
 function prefillOnboarding(prefs) {
   clearBubbleSelections();
   $("#signatureNote").value = "";
-  if (!prefs) return;
 
-  (prefs.proteins || []).forEach(v => {
-    const b = document.querySelector(`#proteinBubbles .bubble[data-value="${v}"]`);
-    if (b) b.classList.add("selected");
-  });
-  Object.entries(prefs.mealStyle || {}).forEach(([slot, val]) => {
-    const groupId = STYLE_GROUP_IDS[slot];
-    const b = groupId && document.querySelector(`#${groupId} .bubble[data-value="${val}"]`);
-    if (b) b.classList.add("selected");
-  });
-  if (prefs.signature) {
-    if (prefs.signature.slot) {
-      const b = document.querySelector(`#signatureSlot .bubble[data-value="${prefs.signature.slot}"]`);
+  if (prefs) {
+    (prefs.proteins || []).forEach(v => {
+      const b = document.querySelector(`#proteinBubbles .bubble[data-value="${v}"]`);
       if (b) b.classList.add("selected");
-    }
-    if (prefs.signature.preset) {
-      const b = document.querySelector(`#signaturePreset .bubble[data-value="${prefs.signature.preset}"]`);
+    });
+    (prefs.dislikedProteins || []).forEach(v => {
+      const b = document.querySelector(`#proteinBubbles .bubble[data-value="${v}"]`);
+      if (b) b.classList.add("disliked");
+    });
+    Object.entries(prefs.mealStyle || {}).forEach(([slot, val]) => {
+      const groupId = STYLE_GROUP_IDS[slot];
+      const b = groupId && document.querySelector(`#${groupId} .bubble[data-value="${val}"]`);
       if (b) b.classList.add("selected");
+    });
+    if (prefs.signature) {
+      if (prefs.signature.slot) {
+        const b = document.querySelector(`#signatureSlot .bubble[data-value="${prefs.signature.slot}"]`);
+        if (b) b.classList.add("selected");
+      }
+      if (prefs.signature.preset) {
+        const b = document.querySelector(`#signaturePreset .bubble[data-value="${prefs.signature.preset}"]`);
+        if (b) b.classList.add("selected");
+      }
+      $("#signatureNote").value = prefs.signature.note || "";
     }
-    $("#signatureNote").value = prefs.signature.note || "";
   }
+
+  // Calorie/budget aren't part of PREFS_KEY — they live in Settings already,
+  // so seed the wizard's copies from whatever Settings currently holds.
+  $("#obCalories").value = $("#calories").value;
+  $("#obCaloriesSlider").value = $("#calories").value;
+
+  const period = $("#budgetPeriod").value;
+  const periodBtn = document.querySelector(`#obBudgetPeriod .bubble[data-value="${period}"]`);
+  if (periodBtn) periodBtn.classList.add("selected");
+  $("#obBudgetAmount").value = $("#budgetAmount").value;
+  applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", period);
 }
 
 function collectPreferences() {
   const proteins = [...document.querySelectorAll("#proteinBubbles .bubble.selected")].map(b => b.dataset.value);
+  const dislikedProteins = [...document.querySelectorAll("#proteinBubbles .bubble.disliked")].map(b => b.dataset.value);
 
   const mealStyle = {};
   Object.entries(STYLE_GROUP_IDS).forEach(([slot, groupId]) => {
@@ -154,14 +223,32 @@ function collectPreferences() {
 
   return {
     proteins: proteins.length ? proteins : undefined,
+    dislikedProteins: dislikedProteins.length ? dislikedProteins : undefined,
     mealStyle: Object.keys(mealStyle).length ? mealStyle : undefined,
     signature,
   };
 }
 
+// Copies the wizard's calorie/budget-period/budget answers into the real
+// Settings fields (and their sliders), matching Settings' own lazy-persist
+// convention — nothing is written to STORAGE_KEY until Generate Plan runs.
+function applyOnboardingBudgetCaloriesToSettings() {
+  $("#calories").value = $("#obCalories").value;
+  $("#caloriesSlider").value = $("#obCalories").value;
+
+  const periodBtn = document.querySelector("#obBudgetPeriod .bubble.selected");
+  const period = periodBtn ? periodBtn.dataset.value : $("#budgetPeriod").value;
+  $("#budgetPeriod").value = period;
+  $("#budgetAmount").value = $("#obBudgetAmount").value;
+  applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", period);
+
+  checkBudgetFeasibility();
+}
+
 function finishOnboarding() {
   localStorage.setItem(PREFS_KEY, JSON.stringify(collectPreferences()));
   localStorage.setItem(ONBOARDED_KEY, "1");
+  applyOnboardingBudgetCaloriesToSettings();
   hideOnboarding();
 }
 
@@ -171,10 +258,19 @@ function loadPreferences() {
 }
 
 function initOnboarding() {
-  wireBubbleGroup($("#proteinBubbles"), true);
-  Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), false));
-  wireBubbleGroup($("#signatureSlot"), false);
-  wireBubbleGroup($("#signaturePreset"), false);
+  wireBubbleGroup($("#proteinBubbles"), "tristate");
+  Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), "single"));
+  wireBubbleGroup($("#signatureSlot"), "single");
+  wireBubbleGroup($("#signaturePreset"), "single");
+
+  wireBubbleGroup($("#obBudgetPeriod"), "single");
+  $("#obBudgetPeriod").addEventListener("click", (e) => {
+    const btn = e.target.closest(".bubble");
+    if (btn) applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", btn.dataset.value);
+  });
+
+  syncSlider("#obCalories", "#obCaloriesSlider");
+  syncSlider("#obBudgetAmount", "#obBudgetAmountSlider");
 
   $("#wizardNext").addEventListener("click", () => {
     if (wizardStep < WIZARD_TOTAL_STEPS) goToWizardStep(wizardStep + 1);
@@ -192,8 +288,18 @@ function initOnboarding() {
     showOnboarding();
   });
 
-  if (localStorage.getItem(ONBOARDED_KEY)) hideOnboarding();
-  else showOnboarding();
+  $("#getStartedBtn").addEventListener("click", showOnboarding);
+  $("#welcomeSkip").addEventListener("click", () => {
+    localStorage.setItem(ONBOARDED_KEY, "1");
+    hideWelcome();
+    hideOnboarding();
+  });
+
+  if (localStorage.getItem(ONBOARDED_KEY)) {
+    hideWelcome();
+    hideOnboarding();
+  }
+  // else: the welcome screen is visible by default in the markup — nothing to do.
 }
 
 function readSettings() {
@@ -385,6 +491,13 @@ function init() {
 
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) writeSettingsToForm(JSON.parse(saved));
+
+  applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value);
+  syncSlider("#calories", "#caloriesSlider");
+  syncSlider("#budgetAmount", "#budgetAmountSlider");
+  $("#budgetPeriod").addEventListener("change", () => {
+    applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value);
+  });
 
   const savedPlan = localStorage.getItem(PLAN_KEY);
   if (savedPlan) renderPlan(JSON.parse(savedPlan));

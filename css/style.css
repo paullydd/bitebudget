@@ -67,6 +67,20 @@ body {
 }
 .text-link-btn:hover { text-decoration: underline; }
 
+/* ---------- Welcome screen ---------- */
+.welcome-screen {
+  text-align: center;
+  padding: 56px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.welcome-icon { font-size: 3.2rem; line-height: 1; }
+.welcome-title { margin: 4px 0 0; font-size: 2rem; }
+.welcome-tagline { color: var(--muted); margin: 0 0 20px; max-width: 32em; }
+.welcome-cta { padding: 14px 32px; font-size: 1.05rem; margin-bottom: 6px; }
+
 /* ---------- Onboarding wizard ---------- */
 .onboarding-intro { color: var(--muted); margin-top: -6px; }
 .wizard-progress { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent-dark); margin-bottom: 16px; }
@@ -91,6 +105,7 @@ body {
 }
 .bubble:hover { background: #eef1ec; }
 .bubble.selected { background: var(--accent); color: white; border-color: var(--accent); }
+.bubble.disliked { background: var(--bad); color: white; border-color: var(--bad); }
 
 .wizard-nav {
   display: flex;
@@ -101,6 +116,43 @@ body {
   border-top: 1px solid var(--border);
 }
 .wizard-nav-buttons { display: flex; gap: 10px; }
+
+/* ---------- Slider + number controls ---------- */
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type="number"] { width: 6em; flex: 0 0 auto; }
+.slider-row input[type="range"] {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
+}
+.slider-row input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+}
 
 /* ---------- Warning banner ---------- */
 .warning-banner {

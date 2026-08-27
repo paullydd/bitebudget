@@ -77,8 +77,11 @@ specific store (there's no public API for that). To make it accurate for
 you:
 
 - **`js/foods.js`** — edit `price` (USD per 100g) for any food to match your
-  local store. Add new foods here (with `cal`, `protein`, `carbs`, `fat`,
-  `price`, `veg`, and optionally `proteinFamily` — see below).
+  local store. Add new foods here (with `protein`, `carbs`, `fat`, `price`,
+  `veg`, and optionally `proteinFamily` — see below). There's no `cal` field
+  to set: calories are always derived from protein/carbs/fat (4/4/9 cal per
+  gram), so they can never drift out of sync with the macros shown alongside
+  them.
 - **`js/meals.js`** — add or edit meal templates. Each references foods from
   `foods.js` by key, with a base gram amount, instructions, and a `style` tag
   used by the preference system. The planner automatically scales portions

@@ -111,6 +111,36 @@ function estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly) {
   return total;
 }
 
+// Recomputes a day's totals from its current meals — used both by initial
+// plan generation and after a single-meal swap, so the two never drift.
+function recomputeDayTotals(day) {
+  day.totals = day.meals.reduce((acc, m) => {
+    acc.cal += m.nutrition.cal;
+    acc.protein += m.nutrition.protein;
+    acc.carbs += m.nutrition.carbs;
+    acc.fat += m.nutrition.fat;
+    acc.cost += m.nutrition.cost;
+    return acc;
+  }, { cal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 });
+}
+
+// Aggregates every ingredient across a plan into a shopping list with a
+// total cost estimate — used both by initial plan generation and after a
+// single-meal swap, so the two never drift.
+function buildShoppingList(plan) {
+  const shoppingMap = {};
+  for (const day of plan) {
+    for (const meal of day.meals) {
+      for (const { food, grams } of meal.items) {
+        shoppingMap[food] = (shoppingMap[food] || 0) + grams;
+      }
+    }
+  }
+  return Object.entries(shoppingMap).map(([food, grams]) => ({
+    food, name: FOODS[food].name, grams, cost: (FOODS[food].price * grams) / 100,
+  })).sort((a, b) => b.cost - a.cost);
+}
+
 // Build a full multi-day plan. preferences (see foods.js/meals.js tags) is
 // optional — omitting it reproduces the original untargeted behavior.
 function generatePlan(settings, preferences) {
@@ -129,7 +159,6 @@ function generatePlan(settings, preferences) {
 
   for (let d = 0; d < days; d++) {
     const dayMeals = [];
-    let dayCal = 0, dayProtein = 0, dayCarbs = 0, dayFat = 0, dayCost = 0;
     const overBudgetSoFar = runningCost > dailyBudget * d;
 
     const slotsToday = ["breakfast", "lunch", "dinner", ...Array(snacksPerDay).fill("snack")];
@@ -145,40 +174,20 @@ function generatePlan(settings, preferences) {
       const nutrition = computeNutrition(items);
 
       dayMeals.push({
-        slot, name: template.name, items, instructions: template.instructions, nutrition,
+        slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
       });
 
       recent[slot].push(template.id);
       if (recent[slot].length > 3) recent[slot].shift();
-
-      dayCal += nutrition.cal;
-      dayProtein += nutrition.protein;
-      dayCarbs += nutrition.carbs;
-      dayFat += nutrition.fat;
-      dayCost += nutrition.cost;
     }
 
-    runningCost += dayCost;
-    plan.push({
-      day: d + 1,
-      meals: dayMeals,
-      totals: { cal: dayCal, protein: dayProtein, carbs: dayCarbs, fat: dayFat, cost: dayCost },
-    });
+    const day = { day: d + 1, meals: dayMeals, totals: null };
+    recomputeDayTotals(day);
+    runningCost += day.totals.cost;
+    plan.push(day);
   }
 
-  // Aggregate shopping list across the whole plan.
-  const shoppingMap = {};
-  for (const day of plan) {
-    for (const meal of day.meals) {
-      for (const { food, grams } of meal.items) {
-        shoppingMap[food] = (shoppingMap[food] || 0) + grams;
-      }
-    }
-  }
-  const shoppingList = Object.entries(shoppingMap).map(([food, grams]) => ({
-    food, name: FOODS[food].name, grams, cost: (FOODS[food].price * grams) / 100,
-  })).sort((a, b) => b.cost - a.cost);
-
+  const shoppingList = buildShoppingList(plan);
   const totalCost = shoppingList.reduce((s, i) => s + i.cost, 0);
   const totalBudget = dailyBudget * days;
 
@@ -186,4 +195,41 @@ function generatePlan(settings, preferences) {
     plan, shoppingList,
     summary: { totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly },
   };
+}
+
+// Rerolls exactly one meal in an already-generated plan (mutates `result` in
+// place). Reuses the same per-slot target-calorie math and pickTemplate()
+// used during initial generation, so preference weighting, dislikes, and
+// budget-awareness all apply identically to a manual swap.
+function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
+  const { dailyCalories, snacksPerDay, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
+  const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
+  const snackPct = 0.10 / Math.max(1, snacksPerDay);
+
+  const day = result.plan[dayIndex];
+  const oldMeal = day.meals[mealIndex];
+  const slot = oldMeal.slot;
+  const pct = slot === "snack" ? snackPct : slotPct[slot];
+  const targetCal = dailyCalories * pct;
+
+  const nearbyDays = result.plan.filter((d, i) => Math.abs(i - dayIndex) <= 3 && i !== dayIndex);
+  const avoidIds = nearbyDays.flatMap(d => d.meals.filter(m => m.slot === slot).map(m => m.id));
+  avoidIds.push(oldMeal.id);
+
+  const overBudget = day.totals.cost > dailyBudget;
+  const template = pickTemplate(slot, avoidIds, vegetarianOnly, overBudget, preferences);
+
+  const base = computeNutrition(template.items);
+  let factor = base.cal > 0 ? targetCal / base.cal : 1;
+  factor = Math.min(1.4, Math.max(0.7, factor));
+  const items = scaleItems(template.items, factor);
+  const nutrition = computeNutrition(items);
+
+  day.meals[mealIndex] = { slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition };
+  recomputeDayTotals(day);
+
+  result.shoppingList = buildShoppingList(result.plan);
+  result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
+  return result;
 }

@@ -55,6 +55,16 @@ that runs in any modern browser.
 - **Reset app** — a footer link that clears everything (preferences,
   settings, saved plan, onboarding status) and reloads to the welcome
   screen, so you can see the app exactly as a brand-new visitor would.
+- **Swap a single meal** — a 🔀 button on every meal card rerolls just that
+  meal (same slot, same variety/preference/budget rules as a full generate)
+  instead of "Shuffle" regenerating the whole week.
+- **Interactive shopping list** — grouped by grocery-store section (Produce,
+  Protein, Dairy, Pantry & Grains) instead of sorted by cost, with checkboxes
+  you can tick off while actually shopping. Checked state survives a reload
+  and a single-meal swap, but resets on a new Generate/Shuffle.
+- **Dark mode** — follows your system's light/dark setting by default; a
+  toggle in the header lets you override it, and the choice is remembered.
+  Printing always stays light regardless of the on-screen theme.
 
 ## Running it
 
@@ -121,7 +131,10 @@ you:
 
 `estimateMinDailyCost()` in the same file computes a realistic best-case
 daily cost (cheapest eligible template per slot, same scaling bounds) — this
-is what powers the budget feasibility warning.
+is what powers the budget feasibility warning. `regenerateMeal()` reuses the
+same per-slot logic to reroll exactly one meal in place (the 🔀 button),
+then rebuilds the day's totals and the shopping list so nothing drifts out
+of sync.
 
 ## Project structure
 

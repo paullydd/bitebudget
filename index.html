@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BiteBudget</title>
 <meta name="description" content="Plan varied, calorie- and macro-tracked meals that fit your grocery budget.">
-<meta name="theme-color" content="#3f7d5c">
+<meta name="theme-color" content="#3f7d5c" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1e2420" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
@@ -23,6 +24,7 @@
         <span id="textSizeLabel" class="text-size-label">100%</span>
         <button type="button" id="textSizeUp" aria-label="Increase text size">A+</button>
       </div>
+      <button type="button" id="themeToggle" class="icon-toggle-btn" aria-label="Toggle dark mode">🌙</button>
     </div>
     <h1><img src="icons/icon.svg" alt="" class="logo-mark"> BiteBudget</h1>
     <p>Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>

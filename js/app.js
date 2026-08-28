@@ -4,6 +4,9 @@ const FONT_SCALE_KEY = "biteBudget.fontScale.v1";
 const FONT_SCALES = [90, 100, 112, 125, 140];
 const PREFS_KEY = "biteBudget.preferences.v1";
 const ONBOARDED_KEY = "biteBudget.onboarded.v1";
+const SHOPPING_CHECKED_KEY = "biteBudget.shoppingChecked.v1";
+const THEME_KEY = "biteBudget.theme.v1";
+const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const WIZARD_TOTAL_STEPS = 5;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
 const BUDGET_SLIDER_RANGES = {
@@ -44,6 +47,22 @@ function initFontScale() {
   $("#textSizeUp").addEventListener("click", () => {
     index = Math.min(FONT_SCALES.length - 1, index + 1);
     applyFontScale(FONT_SCALES[index]);
+  });
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  $("#themeToggle").textContent = theme === "dark" ? "☀️" : "🌙";
+  localStorage.setItem(THEME_KEY, theme);
+}
+
+function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(saved || (systemDark ? "dark" : "light"));
+
+  $("#themeToggle").addEventListener("click", () => {
+    applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
   });
 }
 
@@ -396,7 +415,7 @@ function slotIcon(slot) {
   return { breakfast: "🌅", lunch: "🥗", dinner: "🍽️", snack: "🍎" }[slot] || "🍴";
 }
 
-function renderMealCard(meal) {
+function renderMealCard(meal, dayIndex, mealIndex) {
   const n = meal.nutrition;
   const items = meal.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("");
   const steps = meal.instructions.map(s => `<li>${s}</li>`).join("");
@@ -408,6 +427,7 @@ function renderMealCard(meal) {
           <div class="meal-slot">${meal.slot}</div>
           <div class="meal-name">${meal.name}</div>
         </div>
+        <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
         <div class="meal-cost">${money(n.cost)}</div>
       </div>
       <div class="meal-macros">
@@ -432,7 +452,7 @@ function renderMealCard(meal) {
     </div>`;
 }
 
-function renderDayTab(day, dailyBudget, dailyCalories, minDailyCost) {
+function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost) {
   const t = day.totals;
   const overBudget = t.cost > dailyBudget * 1.05;
   const budgetClass = overBudget ? "bad" : "good";
@@ -457,33 +477,57 @@ function renderDayTab(day, dailyBudget, dailyCalories, minDailyCost) {
       </div>
     </div>
     <div class="meal-grid">
-      ${day.meals.map(renderMealCard).join("")}
+      ${day.meals.map((m, mi) => renderMealCard(m, dayIndex, mi)).join("")}
     </div>`;
 }
 
+function loadCheckedShoppingItems() {
+  const saved = localStorage.getItem(SHOPPING_CHECKED_KEY);
+  return saved ? new Set(JSON.parse(saved)) : new Set();
+}
+
+function saveCheckedShoppingItems(checked) {
+  localStorage.setItem(SHOPPING_CHECKED_KEY, JSON.stringify([...checked]));
+}
+
 function renderShoppingList(shoppingList, totalCost, totalBudget) {
-  const rows = shoppingList.map(i => `
-    <tr>
-      <td>${i.name}</td>
-      <td>${grams(i.grams)}</td>
-      <td>${money(i.cost)}</td>
-    </tr>`).join("");
+  const checked = loadCheckedShoppingItems();
+
+  const groups = {};
+  shoppingList.forEach(item => {
+    const cat = FOODS[item.food].category || "Pantry & Grains";
+    (groups[cat] = groups[cat] || []).push(item);
+  });
+
+  const sections = SHOPPING_CATEGORY_ORDER.filter(cat => groups[cat]).map(cat => {
+    const items = [...groups[cat]].sort((a, b) => a.name.localeCompare(b.name));
+    const rows = items.map(i => `
+      <li class="shopping-item ${checked.has(i.food) ? "checked" : ""}">
+        <label>
+          <input type="checkbox" class="shopping-check" data-food="${i.food}" ${checked.has(i.food) ? "checked" : ""}>
+          <span class="shopping-item-name">${i.name}</span>
+          <span class="shopping-item-qty">${grams(i.grams)}</span>
+          <span class="shopping-item-cost">${money(i.cost)}</span>
+        </label>
+      </li>`).join("");
+    return `
+      <div class="shopping-group">
+        <h4>${cat}</h4>
+        <ul class="shopping-items">${rows}</ul>
+      </div>`;
+  }).join("");
+
   const overBudget = totalCost > totalBudget * 1.02;
   return `
-    <table class="shopping-table">
-      <thead><tr><th>Item</th><th>Total Qty</th><th>Est. Cost</th></tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot>
-        <tr>
-          <td><strong>Total</strong></td>
-          <td></td>
-          <td class="${overBudget ? "bad" : "good"}"><strong>${money(totalCost)}</strong> / ${money(totalBudget)}</td>
-        </tr>
-      </tfoot>
-    </table>`;
+    ${sections}
+    <div class="shopping-total ${overBudget ? "bad" : "good"}">
+      <strong>Total</strong>
+      <span>${money(totalCost)} / ${money(totalBudget)}</span>
+    </div>`;
 }
 
 function renderPlan(result) {
+  currentPlanResult = result;
   const { plan, shoppingList, summary } = result;
   const targets = macroTargetGrams(summary.dailyCalories, summary.macroSplit);
   const minDailyCost = estimateMinDailyCost(summary.dailyCalories, summary.snacksPerDay, summary.vegetarianOnly);
@@ -505,22 +549,27 @@ function renderPlan(result) {
   const tabs = plan.map(d => `<button class="day-tab" data-day="${d.day}">Day ${d.day}</button>`).join("");
   $("#dayTabs").innerHTML = tabs;
 
-  const dayViews = plan.map(d => `<div class="day-view" data-day="${d.day}">${renderDayTab(d, summary.dailyBudget, summary.dailyCalories, minDailyCost)}</div>`).join("");
+  const dayViews = plan.map((d, di) => `<div class="day-view" data-day="${d.day}">${renderDayTab(d, di, summary.dailyBudget, summary.dailyCalories, minDailyCost)}</div>`).join("");
   $("#dayViews").innerHTML = dayViews;
 
   $("#shoppingList").innerHTML = renderShoppingList(shoppingList, summary.totalCost, summary.totalBudget);
 
-  activateDay(1);
+  activateDay(activeDayNum);
   $("#results").classList.remove("hidden");
 }
 
+let activeDayNum = 1;
+let currentPlanResult = null;
+
 function activateDay(dayNum) {
+  activeDayNum = dayNum;
   document.querySelectorAll(".day-tab").forEach(b => b.classList.toggle("active", Number(b.dataset.day) === dayNum));
   document.querySelectorAll(".day-view").forEach(v => v.classList.toggle("active", Number(v.dataset.day) === dayNum));
 }
 
 function init() {
   initFontScale();
+  initTheme();
   initOnboarding();
 
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -541,6 +590,8 @@ function init() {
     const settings = readSettings();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     const result = generatePlan(settings, loadPreferences());
+    localStorage.removeItem(SHOPPING_CHECKED_KEY);
+    activeDayNum = 1;
     localStorage.setItem(PLAN_KEY, JSON.stringify(result));
     renderPlan(result);
     $("#results").scrollIntoView({ behavior: "smooth" });
@@ -549,12 +600,24 @@ function init() {
   $("#regenerateBtn").addEventListener("click", () => {
     const settings = readSettings();
     const result = generatePlan(settings, loadPreferences());
+    localStorage.removeItem(SHOPPING_CHECKED_KEY);
+    activeDayNum = 1;
     localStorage.setItem(PLAN_KEY, JSON.stringify(result));
     renderPlan(result);
   });
 
   $("#dayTabs").addEventListener("click", (e) => {
     if (e.target.matches(".day-tab")) activateDay(Number(e.target.dataset.day));
+  });
+
+  $("#dayViews").addEventListener("click", (e) => {
+    const btn = e.target.closest(".meal-swap-btn");
+    if (!btn || !currentPlanResult) return;
+    const dayIndex = Number(btn.dataset.dayIndex);
+    const mealIndex = Number(btn.dataset.mealIndex);
+    regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences());
+    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
+    renderPlan(currentPlanResult);
   });
 
   ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian"].forEach(sel => {
@@ -566,6 +629,15 @@ function init() {
   $("#printListBtn").addEventListener("click", () => {
     document.body.classList.add("print-shopping-list");
     window.print();
+  });
+
+  $("#shoppingList").addEventListener("change", (e) => {
+    if (!e.target.matches(".shopping-check")) return;
+    const checked = loadCheckedShoppingItems();
+    const food = e.target.dataset.food;
+    if (e.target.checked) checked.add(food); else checked.delete(food);
+    saveCheckedShoppingItems(checked);
+    e.target.closest(".shopping-item").classList.toggle("checked", e.target.checked);
   });
 
   $("#resetAppBtn").addEventListener("click", () => {

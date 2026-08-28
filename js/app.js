@@ -567,6 +567,14 @@ function init() {
     document.body.classList.add("print-shopping-list");
     window.print();
   });
+
+  $("#resetAppBtn").addEventListener("click", () => {
+    if (!confirm("Reset BiteBudget? This clears your preferences, settings, and saved plan, and starts fresh like a new visitor.")) return;
+    Object.keys(localStorage)
+      .filter(k => k.startsWith("biteBudget."))
+      .forEach(k => localStorage.removeItem(k));
+    location.reload();
+  });
   window.addEventListener("afterprint", () => {
     document.body.classList.remove("print-shopping-list");
   });

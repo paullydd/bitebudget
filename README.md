@@ -52,6 +52,9 @@ that runs in any modern browser.
 - **Collapsible Settings** — the Settings panel is split into "Plan basics"
   (open by default) and "Advanced" (macros, vegetarian — collapsed by
   default) so the everyday page stays short even with both sliders in it.
+- **Reset app** — a footer link that clears everything (preferences,
+  settings, saved plan, onboarding status) and reloads to the welcome
+  screen, so you can see the app exactly as a brand-new visitor would.
 
 ## Running it
 

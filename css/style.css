@@ -304,6 +304,7 @@ details summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; 
 
 footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding-bottom: 30px; }
 footer code { background: #eee; padding: 2px 6px; border-radius: 4px; }
+footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85rem; }
 
 @media (max-width: 600px) {
   .meal-detail { grid-template-columns: 1fr; }

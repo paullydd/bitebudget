@@ -1,4 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path fill="#3f7d5c" d="M 60.91 13.51 A 40 40 0 1 0 86.47 35.55 A 17 17 0 0 1 60.91 13.51 Z"/>
-  <text x="49" y="68" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="48" fill="#f6f5f1" text-anchor="middle">$</text>
+  <defs>
+    <mask id="bites">
+      <rect width="100" height="100" fill="white"/>
+      <circle cx="74" cy="24" r="15" fill="black"/>
+      <circle cx="60" cy="14" r="8" fill="black"/>
+      <circle cx="83" cy="33" r="6" fill="black"/>
+    </mask>
+  </defs>
+  <circle cx="50" cy="52" r="40" fill="#3f7d5c" mask="url(#bites)"/>
+  <text x="49" y="68" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="48" fill="#d4af37" text-anchor="middle">$</text>
 </svg>

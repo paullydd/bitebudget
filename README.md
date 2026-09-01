@@ -19,8 +19,11 @@ that runs in any modern browser.
 - **Budget tracking** — set a daily, weekly, or monthly grocery budget. Each
   day and the whole plan show estimated cost vs. budget, and the planner
   actively favors cheaper meals once you're tracking over budget.
-- **Instructions** — every meal includes ingredient quantities (in grams) and
-  step-by-step prep instructions.
+- **Cookbook-style recipes** — "📖 View Recipe" on any meal opens it as a
+  full recipe page (parchment styling, serif type, an ingredients/
+  instructions spread with a spine line down the middle) instead of a
+  cramped inline expand — full ingredient list with measurements and
+  step-by-step instructions.
 - **Shopping list** — aggregates all ingredients across the whole plan into
   one list with quantities and total estimated cost.
 - **Vegetarian filter** and a "shuffle" button to regenerate with more

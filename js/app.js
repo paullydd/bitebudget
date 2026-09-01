@@ -417,8 +417,6 @@ function slotIcon(slot) {
 
 function renderMealCard(meal, dayIndex, mealIndex) {
   const n = meal.nutrition;
-  const items = meal.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("");
-  const steps = meal.instructions.map(s => `<li>${s}</li>`).join("");
   return `
     <div class="meal-card">
       <div class="meal-head">
@@ -436,20 +434,19 @@ function renderMealCard(meal, dayIndex, mealIndex) {
         <span>C ${grams(n.carbs)}</span>
         <span>F ${grams(n.fat)}</span>
       </div>
-      <details>
-        <summary>Ingredients &amp; instructions</summary>
-        <div class="meal-detail">
-          <div>
-            <strong>Ingredients</strong>
-            <ul>${items}</ul>
-          </div>
-          <div>
-            <strong>Instructions</strong>
-            <ol>${steps}</ol>
-          </div>
-        </div>
-      </details>
+      <button type="button" class="recipe-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}">📖 View Recipe</button>
     </div>`;
+}
+
+// Opens the shared recipe dialog styled as a cookbook page for one meal.
+function openRecipeModal(meal) {
+  const n = meal.nutrition;
+  $("#recipeSlot").textContent = meal.slot;
+  $("#recipeTitle").textContent = meal.name;
+  $("#recipeMacros").textContent = `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)}`;
+  $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("");
+  $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${s}</li>`).join("");
+  $("#recipeModal").showModal();
 }
 
 function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost) {
@@ -611,13 +608,29 @@ function init() {
   });
 
   $("#dayViews").addEventListener("click", (e) => {
-    const btn = e.target.closest(".meal-swap-btn");
-    if (!btn || !currentPlanResult) return;
-    const dayIndex = Number(btn.dataset.dayIndex);
-    const mealIndex = Number(btn.dataset.mealIndex);
-    regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences());
-    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
-    renderPlan(currentPlanResult);
+    if (!currentPlanResult) return;
+
+    const swapBtn = e.target.closest(".meal-swap-btn");
+    if (swapBtn) {
+      const dayIndex = Number(swapBtn.dataset.dayIndex);
+      const mealIndex = Number(swapBtn.dataset.mealIndex);
+      regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences());
+      localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
+      renderPlan(currentPlanResult);
+      return;
+    }
+
+    const recipeBtn = e.target.closest(".recipe-btn");
+    if (recipeBtn) {
+      const dayIndex = Number(recipeBtn.dataset.dayIndex);
+      const mealIndex = Number(recipeBtn.dataset.mealIndex);
+      openRecipeModal(currentPlanResult.plan[dayIndex].meals[mealIndex]);
+    }
+  });
+
+  $("#recipeCloseBtn").addEventListener("click", () => $("#recipeModal").close());
+  $("#recipeModal").addEventListener("click", (e) => {
+    if (e.target === $("#recipeModal")) $("#recipeModal").close();
   });
 
   ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian"].forEach(sel => {

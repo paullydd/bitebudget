@@ -255,6 +255,27 @@
     </section>
   </main>
 
+  <dialog id="recipeModal" class="recipe-modal">
+    <div class="recipe-page">
+      <button type="button" id="recipeCloseBtn" class="recipe-close" aria-label="Close recipe">✕</button>
+      <div class="recipe-header">
+        <div class="recipe-slot" id="recipeSlot"></div>
+        <h2 class="recipe-title" id="recipeTitle"></h2>
+        <div class="recipe-macros" id="recipeMacros"></div>
+      </div>
+      <div class="recipe-body">
+        <div class="recipe-ingredients">
+          <h3>Ingredients</h3>
+          <ul id="recipeIngredients"></ul>
+        </div>
+        <div class="recipe-instructions">
+          <h3>Instructions</h3>
+          <ol id="recipeInstructions"></ol>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
   <footer>
     <p>BiteBudget uses national-average grocery prices, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>
     <button type="button" id="resetAppBtn" class="text-link-btn">Reset app</button>

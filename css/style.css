@@ -360,9 +360,89 @@ form { display: flex; flex-direction: column; gap: 16px; }
 }
 .meal-swap-btn:hover { background: var(--hover-bg); }
 .meal-macros { display: flex; gap: 12px; margin: 10px 0; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
-.meal-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 8px; font-size: 0.9rem; }
-.meal-detail ul, .meal-detail ol { margin: 6px 0 0; padding-left: 18px; }
-details summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; font-size: 0.88rem; }
+.recipe-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--accent-dark);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  width: 100%;
+}
+.recipe-btn:hover { background: var(--hover-bg); }
+
+/* ---------- Recipe modal: styled like an open cookbook page ---------- */
+.recipe-modal {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  max-width: 680px;
+  width: 92vw;
+  max-height: 88vh;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+.recipe-modal::backdrop {
+  background: rgba(15, 15, 10, 0.65);
+}
+.recipe-page {
+  background: #fdf8ee;
+  color: #2b241a;
+  font-family: Georgia, "Times New Roman", serif;
+  padding: 40px 36px 32px;
+  max-height: 88vh;
+  overflow-y: auto;
+  position: relative;
+}
+.recipe-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  border: none;
+  background: rgba(0, 0, 0, 0.07);
+  color: #2b241a;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.recipe-close:hover { background: rgba(0, 0, 0, 0.14); }
+.recipe-header { text-align: center; margin-bottom: 26px; padding-bottom: 20px; border-bottom: 3px double #cabf9e; }
+.recipe-slot {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: #8a7a52;
+  margin-bottom: 8px;
+}
+.recipe-title { font-size: 1.7rem; margin: 0 0 10px; }
+.recipe-macros { font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.82rem; color: #6b5f45; }
+
+.recipe-body { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+.recipe-body h3 {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.78rem;
+  color: #8a7a52;
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e0d5b8;
+}
+.recipe-instructions { border-left: 1px solid #e0d5b8; padding-left: 32px; }
+.recipe-ingredients ul { list-style: none; margin: 0; padding: 0; }
+.recipe-ingredients li { padding: 7px 0; border-bottom: 1px dotted #e0d5b8; }
+.recipe-instructions ol { margin: 0; padding-left: 20px; }
+.recipe-instructions li { padding: 6px 0; line-height: 1.65; }
+
+@media (max-width: 640px) {
+  .recipe-body { grid-template-columns: 1fr; gap: 22px; }
+  .recipe-instructions { border-left: none; padding-left: 0; border-top: 1px solid #e0d5b8; padding-top: 20px; }
+}
 
 .shopping-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .shopping-head h3 { margin: 0; }
@@ -405,10 +485,6 @@ details summary { cursor: pointer; color: var(--accent-dark); font-weight: 600; 
 footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding-bottom: 30px; }
 footer code { background: var(--panel-alt); color: var(--ink); padding: 2px 6px; border-radius: 4px; }
 footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85rem; }
-
-@media (max-width: 600px) {
-  .meal-detail { grid-template-columns: 1fr; }
-}
 
 @media print {
   /* Printed output is always light, regardless of on-screen dark mode. */

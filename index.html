@@ -232,6 +232,10 @@
             <div class="form-row checkbox-row">
               <label><input type="checkbox" id="vegetarian"> Vegetarian only</label>
             </div>
+            <div class="form-row checkbox-row">
+              <label><input type="checkbox" id="mealPrepMode"> 🧺 Meal prep mode</label>
+            </div>
+            <p class="macro-hint">Repeats just 2 recipes per meal across the week in bigger batches, instead of a new recipe most days — good for cooking once and eating the leftovers.</p>
           </div>
         </details>
 
@@ -243,12 +247,19 @@
       <div class="results-head">
         <h2>Your Plan</h2>
         <div class="results-head-buttons">
+          <button type="button" id="printPrepGuideBtn" class="secondary-btn hidden">🧺 Print Prep Guide</button>
           <button type="button" id="printBookletBtn" class="secondary-btn">🖨️ Print Full Plan</button>
           <button id="regenerateBtn" class="secondary-btn">🔀 Shuffle for more variety</button>
         </div>
       </div>
 
       <div id="planMeta" class="meta-grid"></div>
+
+      <div id="prepBatchesSection" class="hidden">
+        <h3>🧺 This Week's Batches</h3>
+        <p class="wizard-hint">Cook each of these once, then portion out for the week.</p>
+        <div id="prepBatches" class="prep-batches-grid"></div>
+      </div>
 
       <h3 id="weekOverviewHeading">📅 Week at a Glance</h3>
       <div id="weekOverview" class="week-overview-wrap"></div>
@@ -351,6 +362,7 @@
   </dialog>
 
   <div id="printBooklet" class="print-booklet"></div>
+  <div id="printPrepGuide" class="print-booklet"></div>
 
   <footer>
     <p>BiteBudget uses national-average grocery prices, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>

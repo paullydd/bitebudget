@@ -26,6 +26,8 @@ const BADGES = [
   { id: "favorites_5", icon: "❤️", name: "Favorite Fan", desc: "Favorite 5 recipes.", check: s => s.favoritesCount >= 5 },
 ];
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
+const SLOT_ORDER = ["breakfast", "lunch", "dinner", "snack"];
+const PREP_STORAGE_NOTE = "Store in airtight containers in the fridge up to 4 days, or freeze up to 3 months. Reheat covered until steaming.";
 const WIZARD_TOTAL_STEPS = 5;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
 const BUDGET_SLIDER_RANGES = {
@@ -526,6 +528,7 @@ function readSettings() {
     budgetAmount: Number($("#budgetAmount").value),
     snacksPerDay: Number($("#snacks").value),
     vegetarianOnly: $("#vegetarian").checked,
+    mealPrepMode: $("#mealPrepMode").checked,
   };
 }
 
@@ -539,6 +542,7 @@ function writeSettingsToForm(s) {
   $("#budgetAmount").value = s.budgetAmount;
   $("#snacks").value = s.snacksPerDay;
   $("#vegetarian").checked = s.vegetarianOnly;
+  $("#mealPrepMode").checked = !!s.mealPrepMode;
 }
 
 function macroTargetGrams(dailyCalories, split) {
@@ -920,6 +924,50 @@ function renderPrintBooklet(result) {
   return header + days;
 }
 
+// On-screen batch-cooking summary shown only in meal prep mode — one card
+// per distinct recipe across the whole plan (see groupIntoPrepBatches),
+// instead of the day-by-day cards below it.
+function renderPrepBatches(batches) {
+  const sorted = [...batches].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
+  return sorted.map(b => `
+    <div class="prep-batch-card">
+      <div class="prep-batch-slot">${slotIcon(b.slot)} ${b.slot}</div>
+      <div class="prep-batch-name">${b.name}</div>
+      <div class="prep-batch-servings">🧺 Makes ${b.occurrences} serving${b.occurrences === 1 ? "" : "s"} · ${money(b.cost)}</div>
+      <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("")}</ul>
+      <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
+    </div>`).join("");
+}
+
+// Printable version of the same batch grouping — its own separate print
+// document, same pattern as renderPrintBooklet.
+function renderPrintPrepGuide(result) {
+  const batches = groupIntoPrepBatches(result.plan);
+  const sorted = [...batches].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
+  const header = `
+    <div class="booklet-header">
+      <h1>BiteBudget Prep Guide</h1>
+      <p>${result.summary.days} days · cook each recipe once, portion out for the week</p>
+    </div>`;
+  const cards = sorted.map(b => `
+    <div class="booklet-meal">
+      <h3>${slotIcon(b.slot)} ${b.slot} — ${b.name}</h3>
+      <p class="booklet-meal-macros">Makes ${b.occurrences} serving${b.occurrences === 1 ? "" : "s"} · ${money(b.cost)} total</p>
+      <div class="booklet-meal-body">
+        <div>
+          <strong>Total ingredients</strong>
+          <ul>${b.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("")}</ul>
+        </div>
+        <div>
+          <strong>Instructions</strong>
+          <ol>${b.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
+        </div>
+      </div>
+      <p class="booklet-meal-macros">${PREP_STORAGE_NOTE}</p>
+    </div>`).join("");
+  return header + cards;
+}
+
 // Grid: one row per day, one column per meal slot (positional — every day
 // has the same slot sequence since generatePlan's slotsToday is
 // deterministic per settings). Clicking a cell reuses activateDay(), the
@@ -970,6 +1018,12 @@ function renderPlan(result) {
       <div class="value">${money(summary.totalCost)} <span class="muted">/ ${money(summary.totalBudget)} budget</span></div>
       ${totalSuggestion}
     </div>`;
+
+  $("#printPrepGuideBtn").classList.toggle("hidden", !summary.mealPrepMode);
+  $("#prepBatchesSection").classList.toggle("hidden", !summary.mealPrepMode);
+  if (summary.mealPrepMode) {
+    $("#prepBatches").innerHTML = renderPrepBatches(groupIntoPrepBatches(plan));
+  }
 
   $("#weekOverview").innerHTML = renderWeekOverview(plan);
 
@@ -1258,6 +1312,13 @@ function init() {
     window.print();
   });
 
+  $("#printPrepGuideBtn").addEventListener("click", () => {
+    if (!currentPlanResult) return;
+    $("#printPrepGuide").innerHTML = renderPrintPrepGuide(currentPlanResult);
+    document.body.classList.add("print-prep-guide");
+    window.print();
+  });
+
   $("#shoppingList").addEventListener("change", (e) => {
     if (!e.target.matches(".shopping-check")) return;
     const checked = loadCheckedShoppingItems();
@@ -1310,6 +1371,7 @@ function init() {
   window.addEventListener("afterprint", () => {
     document.body.classList.remove("print-shopping-list");
     document.body.classList.remove("print-full-plan");
+    document.body.classList.remove("print-prep-guide");
   });
 
   $("#macroProtein").addEventListener("input", () => balanceMacros("protein"));

@@ -102,6 +102,13 @@ that runs in any modern browser.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
+- **Meal prep mode** — a checkbox in Advanced settings switches the
+  planner from "a new recipe most days" to repeating just 2 recipes per
+  meal in bigger batches across the whole week, for cooking once and
+  eating the leftovers. Adds a "🧺 This Week's Batches" summary (and a
+  matching print guide) that groups the plan by recipe instead of by day —
+  total batch quantity, servings made, and a storage/reheating note —
+  instead of the day-by-day view.
 - **Edit Prices** — a "💲 Edit Prices" button in the header opens every
   food's price in one place, grouped by grocery-store section, each shown
   next to its shipped national-average default. Change what you actually
@@ -188,6 +195,14 @@ make it accurate for you:
    computes nutrition + cost.
 4. Aggregates every ingredient across the whole plan into a shopping list
    with a total cost estimate.
+
+With Meal prep mode on, step 2 runs just once per slot up front (via
+`selectPrepPool()`) to fix 2 recipes for the whole week — using the exact
+same weighting — instead of running fresh every day; each day still
+scales its copy to that day's own calorie target like step 3 always does.
+`groupIntoPrepBatches()` then re-groups the finished plan by recipe for
+the batch view, so nothing about totals, the shopping list, or history
+needs to know the difference.
 
 `estimateMinDailyCost()` in the same file computes a realistic best-case
 daily cost (cheapest eligible template per slot, same scaling bounds) — this

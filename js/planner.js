@@ -197,12 +197,55 @@ function buildShoppingList(plan) {
   })).sort((a, b) => b.cost - a.cost);
 }
 
+// Picks `count` distinct templates for a slot up front — used by meal prep
+// mode to fix a small rotating set for the whole week instead of a fresh
+// pick per day. Reuses pickTemplate's full weighting (macro-fit,
+// preferences, budget); each pick feeds the next call's avoid-list so the
+// pool members are distinct, the same trick the day loop already uses.
+function selectPrepPool(slot, count, vegetarianOnly, preferences, macroSplit) {
+  const pool = [];
+  const usedIds = [];
+  for (let i = 0; i < count; i++) {
+    const template = pickTemplate(slot, usedIds, vegetarianOnly, false, preferences, macroSplit);
+    pool.push(template);
+    usedIds.push(template.id);
+  }
+  return pool;
+}
+
+// Groups a plan's meals by recipe — turns "same recipe on days 1, 3, 5"
+// into one "cook once, makes N servings" card for the prep-batch view.
+// Custom/logged meals are skipped since there's no template to batch.
+function groupIntoPrepBatches(plan) {
+  const groups = {};
+  plan.forEach(day => {
+    day.meals.forEach(m => {
+      if (m.custom) return;
+      if (!groups[m.id]) {
+        groups[m.id] = { id: m.id, name: m.name, slot: m.slot, instructions: m.instructions, occurrences: 0, itemTotals: {}, cost: 0 };
+      }
+      const g = groups[m.id];
+      g.occurrences++;
+      g.cost += m.nutrition.cost;
+      m.items.forEach(({ food, grams }) => {
+        g.itemTotals[food] = (g.itemTotals[food] || 0) + grams;
+      });
+    });
+  });
+  return Object.values(groups).map(g => ({
+    id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, occurrences: g.occurrences, cost: g.cost,
+    items: Object.entries(g.itemTotals).map(([food, grams]) => ({ food, grams })),
+  }));
+}
+
 // Build a full multi-day plan. preferences (see foods.js/meals.js tags) is
-// optional — omitting it reproduces the original untargeted behavior.
+// optional — omitting it reproduces the original untargeted behavior. When
+// settings.mealPrepMode is set, each slot rotates through a small fixed
+// pool (see selectPrepPool) instead of picking fresh every day.
 function generatePlan(settings, preferences) {
   const {
     days, dailyCalories, macroSplit, budgetPeriod, budgetAmount,
-    snacksPerDay, vegetarianOnly,
+    snacksPerDay, vegetarianOnly, mealPrepMode,
   } = settings;
 
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
@@ -210,6 +253,12 @@ function generatePlan(settings, preferences) {
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
 
   const recent = { breakfast: [], lunch: [], dinner: [], snack: [] };
+  const prepPools = mealPrepMode
+    ? Object.fromEntries(["breakfast", "lunch", "dinner", "snack"].map(slot =>
+        [slot, selectPrepPool(slot, 2, vegetarianOnly, preferences, macroSplit)]))
+    : null;
+  const prepCounters = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 };
+
   const plan = [];
   let runningCost = 0;
 
@@ -221,7 +270,15 @@ function generatePlan(settings, preferences) {
     for (const slot of slotsToday) {
       const pct = slot === "snack" ? snackPct : slotPct[slot];
       const targetCal = dailyCalories * pct;
-      const template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, macroSplit);
+
+      let template;
+      if (mealPrepMode) {
+        const pool = prepPools[slot];
+        template = pool[prepCounters[slot] % pool.length];
+        prepCounters[slot]++;
+      } else {
+        template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, macroSplit);
+      }
 
       const base = computeNutrition(template.items);
       let factor = base.cal > 0 ? targetCal / base.cal : 1;
@@ -234,8 +291,10 @@ function generatePlan(settings, preferences) {
         prepTime: template.prepTime, cookTime: template.cookTime,
       });
 
-      recent[slot].push(template.id);
-      if (recent[slot].length > 3) recent[slot].shift();
+      if (!mealPrepMode) {
+        recent[slot].push(template.id);
+        if (recent[slot].length > 3) recent[slot].shift();
+      }
     }
 
     const day = { day: d + 1, meals: dayMeals, totals: null };
@@ -250,7 +309,7 @@ function generatePlan(settings, preferences) {
 
   return {
     plan, shoppingList,
-    summary: { totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly },
+    summary: { totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly, mealPrepMode: !!mealPrepMode },
   };
 }
 

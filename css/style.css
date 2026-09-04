@@ -509,9 +509,14 @@ form { display: flex; flex-direction: column; gap: 16px; }
 }
 .meal-head { display: flex; align-items: flex-start; gap: 10px; }
 .meal-icon { font-size: 1.4rem; }
+.meal-title { flex: 1 1 auto; min-width: 0; }
 .meal-slot { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
 .meal-name { font-weight: 700; }
-.meal-cost { margin-left: auto; font-weight: 700; color: var(--accent-dark); }
+/* Buttons + price move as one unit that never shrinks below its own
+   content — the title above is what gives way (wrapping its text) so this
+   group can never get pushed past the card's edge, however long the name. */
+.meal-head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+.meal-cost { font-weight: 700; color: var(--accent-dark); }
 .meal-swap-btn, .favorite-btn, .custom-meal-btn {
   border: 1px solid var(--border);
   background: var(--panel);

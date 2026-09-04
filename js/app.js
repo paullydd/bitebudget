@@ -613,12 +613,14 @@ function renderMealCard(meal, dayIndex, mealIndex) {
     <div class="meal-card ${meal.custom ? "custom-meal-card" : ""}">
       <div class="meal-head">
         <span class="meal-icon">${slotIcon(meal.slot)}</span>
-        <div>
+        <div class="meal-title">
           <div class="meal-slot">${meal.slot}</div>
           <div class="meal-name">${meal.name}</div>
         </div>
-        ${actionButtons}
-        <div class="meal-cost">${money(n.cost)}</div>
+        <div class="meal-head-actions">
+          ${actionButtons}
+          <div class="meal-cost">${money(n.cost)}</div>
+        </div>
       </div>
       <div class="meal-macros">
         <span>${Math.round(n.cal)} kcal</span>

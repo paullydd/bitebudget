@@ -19,6 +19,7 @@
   <header class="app-header">
     <div class="header-toolbar">
       <button type="button" id="preferencesBtn" class="text-link-btn">🎯 Preferences</button>
+      <button type="button" id="pricesBtn" class="text-link-btn">💲 Edit Prices</button>
       <div class="text-size-toggle" role="group" aria-label="Text size">
         <button type="button" id="textSizeDown" aria-label="Decrease text size">A−</button>
         <span id="textSizeLabel" class="text-size-label">100%</span>
@@ -322,6 +323,21 @@
           <label><input type="checkbox" id="customMealOpen"> Leave this open — I'll fill it in later</label>
         </div>
         <button type="submit" class="primary-btn">Save</button>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="pricesDialog" class="achievements-dialog prices-dialog">
+    <div class="achievements-page">
+      <button type="button" id="pricesCloseBtn" class="recipe-close" aria-label="Close">✕</button>
+      <h2>💲 Edit Prices</h2>
+      <p class="wizard-hint">Prices are U.S. national averages. Enter what you actually pay per 100g to make your budget estimates accurate.</p>
+      <form id="pricesForm">
+        <div id="pricesList"></div>
+        <div class="prices-dialog-actions">
+          <button type="button" id="pricesResetBtn" class="secondary-btn">Reset all to defaults</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
       </form>
     </div>
   </dialog>

@@ -117,6 +117,37 @@ body {
 .custom-meal-dialog { max-width: 440px; }
 .custom-meal-dialog #customMealForm { display: flex; flex-direction: column; gap: 14px; }
 .custom-meal-dialog .primary-btn { width: 100%; }
+.prices-dialog { max-width: 540px; }
+.prices-dialog .achievements-page h2 { margin-bottom: 6px; }
+.prices-dialog .wizard-hint { margin-top: 0; margin-bottom: 18px; }
+.price-group { margin-bottom: 18px; }
+.price-group h4 { margin: 0 0 8px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+.price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.price-row:last-child { border-bottom: none; }
+.price-row-info { display: flex; flex-direction: column; }
+.price-row-name { font-weight: 600; font-size: 0.9rem; }
+.price-row-default { font-size: 0.76rem; color: var(--muted); }
+.price-row-input-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.price-row-input-wrap span { color: var(--muted); font-size: 0.85rem; }
+.price-row input {
+  width: 80px;
+  text-align: right;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--panel-alt);
+  color: var(--ink);
+}
+.prices-dialog-actions { display: flex; gap: 10px; margin-top: 18px; }
+.prices-dialog-actions .primary-btn { flex: 1; }
 .my-meals-list {
   border: 1px solid var(--border);
   border-radius: 10px;

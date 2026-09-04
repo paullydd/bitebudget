@@ -102,6 +102,12 @@ that runs in any modern browser.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
+- **Edit Prices** — a "💲 Edit Prices" button in the header opens every
+  food's price in one place, grouped by grocery-store section, each shown
+  next to its shipped national-average default. Change what you actually
+  pay locally and it's remembered from then on — costs on the current plan
+  update immediately, no API, no account, no ongoing cost. "Reset all to
+  defaults" clears your overrides in one click.
 - **Savings history & achievements** — a progress strip (current streak,
   total saved, plans generated) appears once you've generated at least one
   plan, and an Achievements dialog tracks milestones (budget streaks, total
@@ -139,15 +145,20 @@ files, with no server-side setup:
 ## Editing the data
 
 This ships with **average U.S. grocery prices**, not live prices from a
-specific store (there's no public API for that). To make it accurate for
-you:
+specific store — there's no free public API for real-time grocery pricing
+from any major chain, and one would need a paid plan and a backend to use
+safely, which runs against this being a free, backend-free budget app. To
+make it accurate for you:
 
-- **`js/foods.js`** — edit `price` (USD per 100g) for any food to match your
-  local store. Add new foods here (with `protein`, `carbs`, `fat`, `price`,
-  `veg`, and optionally `proteinFamily` — see below). There's no `cal` field
-  to set: calories are always derived from protein/carbs/fat (4/4/9 cal per
-  gram), so they can never drift out of sync with the macros shown alongside
-  them.
+- **In the app** — click "💲 Edit Prices" in the header for a UI to override
+  any food's price without touching code. Fastest way to make your budget
+  numbers reflect your actual store.
+- **`js/foods.js`** — edit `price` (USD per 100g) for any food to change the
+  shipped default for every visitor (rather than just your own browser). Add
+  new foods here (with `protein`, `carbs`, `fat`, `price`, `veg`, and
+  optionally `proteinFamily` — see below). There's no `cal` field to set:
+  calories are always derived from protein/carbs/fat (4/4/9 cal per gram),
+  so they can never drift out of sync with the macros shown alongside them.
 - **`js/meals.js`** — add or edit meal templates. Each references foods from
   `foods.js` by key, with a base gram amount, instructions, and a `style` tag
   used by the preference system. The planner automatically scales portions

@@ -9,6 +9,11 @@ const THEME_KEY = "biteBudget.theme.v1";
 const FAVORITES_KEY = "biteBudget.favorites.v1";
 const HISTORY_KEY = "biteBudget.history.v1";
 const MY_MEALS_KEY = "biteBudget.myMeals.v1";
+const PRICE_OVERRIDES_KEY = "biteBudget.priceOverrides.v1";
+// Snapshot of FOODS' shipped national-average prices, captured before any
+// override is ever applied — lets the Edit Prices dialog show "(default
+// $X.XX)" next to each field and power "reset to defaults".
+const DEFAULT_PRICES = Object.fromEntries(Object.keys(FOODS).map(k => [k, FOODS[k].price]));
 const RECIPES_TRIED_KEY = "biteBudget.recipesTried.v1";
 const BADGES = [
   { id: "first_plan", icon: "🌱", name: "First Plan", desc: "Generate your first meal plan.", check: s => s.plansGenerated >= 1 },
@@ -693,6 +698,50 @@ function renderMyMealsList() {
       </div>`).join("")}`;
 }
 
+function loadPriceOverrides() {
+  const saved = localStorage.getItem(PRICE_OVERRIDES_KEY);
+  return saved ? JSON.parse(saved) : {};
+}
+
+function savePriceOverrides(overrides) {
+  localStorage.setItem(PRICE_OVERRIDES_KEY, JSON.stringify(overrides));
+}
+
+// Mutates FOODS' price fields in place from any saved overrides — called
+// once at startup so every downstream calculation (planning, shopping
+// list, nutrition label) just sees the corrected price with no special
+// casing needed anywhere else.
+function applyPriceOverrides() {
+  const overrides = loadPriceOverrides();
+  Object.entries(overrides).forEach(([food, price]) => {
+    if (FOODS[food]) FOODS[food].price = price;
+  });
+}
+
+// Builds the grouped-by-category price list inside the Edit Prices dialog.
+function renderPricesList() {
+  const groups = {};
+  Object.keys(FOODS).forEach(food => {
+    const cat = FOODS[food].category || "Pantry & Grains";
+    (groups[cat] = groups[cat] || []).push(food);
+  });
+
+  $("#pricesList").innerHTML = SHOPPING_CATEGORY_ORDER.filter(cat => groups[cat]).map(cat => {
+    const rows = [...groups[cat]].sort((a, b) => FOODS[a].name.localeCompare(FOODS[b].name)).map(food => `
+      <div class="price-row">
+        <div class="price-row-info">
+          <span class="price-row-name">${FOODS[food].name}</span>
+          <span class="price-row-default">default $${DEFAULT_PRICES[food].toFixed(2)}/100g</span>
+        </div>
+        <div class="price-row-input-wrap">
+          <span>$</span>
+          <input type="number" min="0" step="0.01" class="price-input" data-food="${food}" value="${FOODS[food].price.toFixed(2)}">
+        </div>
+      </div>`).join("");
+    return `<div class="price-group"><h4>${cat}</h4>${rows}</div>`;
+  }).join("");
+}
+
 let customMealTarget = null; // { dayIndex, mealIndex, wasCustom }
 
 function updateCustomMealCalories() {
@@ -981,6 +1030,7 @@ function init() {
   initFontScale();
   initTheme();
   initOnboarding();
+  applyPriceOverrides();
 
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) writeSettingsToForm(JSON.parse(saved));
@@ -993,7 +1043,7 @@ function init() {
   });
 
   const savedPlan = localStorage.getItem(PLAN_KEY);
-  if (savedPlan) renderPlan(JSON.parse(savedPlan));
+  if (savedPlan) renderPlan(recomputeAllCosts(JSON.parse(savedPlan)));
   else renderProgressStrip();
 
   $("#planForm").addEventListener("submit", (e) => {
@@ -1148,6 +1198,44 @@ function init() {
   $("#achievementsCloseBtn").addEventListener("click", () => $("#achievementsDialog").close());
   $("#achievementsDialog").addEventListener("click", (e) => {
     if (e.target === $("#achievementsDialog")) $("#achievementsDialog").close();
+  });
+
+  // Re-syncs the currently displayed plan (if any) with whatever prices are
+  // now in effect — reused by both the Save and Reset paths below.
+  function commitPriceChanges() {
+    if (!currentPlanResult) return;
+    recomputeAllCosts(currentPlanResult);
+    updateLatestHistoryEntry(currentPlanResult.summary);
+    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
+    renderPlan(currentPlanResult);
+  }
+
+  $("#pricesBtn").addEventListener("click", () => {
+    renderPricesList();
+    $("#pricesDialog").showModal();
+  });
+  $("#pricesCloseBtn").addEventListener("click", () => $("#pricesDialog").close());
+  $("#pricesDialog").addEventListener("click", (e) => {
+    if (e.target === $("#pricesDialog")) $("#pricesDialog").close();
+  });
+  $("#pricesForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const overrides = {};
+    [...document.querySelectorAll(".price-input")].forEach(input => {
+      const food = input.dataset.food;
+      const val = Math.max(0, Number(input.value) || 0);
+      FOODS[food].price = val;
+      if (Math.abs(val - DEFAULT_PRICES[food]) > 0.001) overrides[food] = val;
+    });
+    savePriceOverrides(overrides);
+    commitPriceChanges();
+    $("#pricesDialog").close();
+  });
+  $("#pricesResetBtn").addEventListener("click", () => {
+    Object.keys(FOODS).forEach(food => { FOODS[food].price = DEFAULT_PRICES[food]; });
+    savePriceOverrides({});
+    renderPricesList();
+    commitPriceChanges();
   });
 
   ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian"].forEach(sel => {

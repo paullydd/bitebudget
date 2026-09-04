@@ -294,6 +294,23 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   return result;
 }
 
+// Recomputes every non-custom meal's nutrition from its already-scaled
+// items — used after a price edit so displayed costs refresh immediately
+// without re-picking any meals. Custom/logged meals are skipped since
+// their nutrition is user-entered, not derived from FOODS prices.
+function recomputeAllCosts(result) {
+  result.plan.forEach(day => {
+    day.meals.forEach(m => {
+      if (m.custom) return;
+      m.nutrition = computeNutrition(m.items);
+    });
+    recomputeDayTotals(day);
+  });
+  result.shoppingList = buildShoppingList(result.plan);
+  result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
+  return result;
+}
+
 // Drops a user-entered meal (known macros, or an open "fill in later"
 // placeholder — see js/app.js's customMeal shape) into one slot of an
 // already-generated plan. When rebalance is true, every *other* still

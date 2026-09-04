@@ -76,6 +76,57 @@ body {
 .logo-mark { width: 1.3em; height: 1.3em; flex: 0 0 auto; }
 .app-header p { margin: 0; color: var(--muted); }
 
+/* ---------- Progress strip ---------- */
+.progress-strip {
+  max-width: 960px;
+  margin: 0 auto 20px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.progress-stat { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.progress-stat-value { font-size: 1.3rem; font-weight: 800; color: var(--accent-dark); }
+.progress-stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+/* ---------- Achievements dialog ---------- */
+.achievements-dialog {
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  max-width: 640px;
+  width: 92vw;
+  max-height: 85vh;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+.achievements-dialog::backdrop { background: rgba(15, 15, 10, 0.65); }
+.achievements-page {
+  background: var(--panel);
+  color: var(--ink);
+  padding: 32px 28px;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+.achievements-page h2 { margin: 0 0 20px; text-align: center; }
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
+.badge-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  background: var(--panel-alt);
+}
+.badge-card.locked { opacity: 0.5; }
+.badge-icon { font-size: 1.8rem; margin-bottom: 6px; }
+.badge-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 4px; }
+.badge-desc { font-size: 0.76rem; color: var(--muted); }
+
 .header-toolbar {
   display: flex;
   align-items: center;
@@ -578,6 +629,7 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
     --border: #e4e1d8;
   }
   body.print-shopping-list .app-header,
+  body.print-shopping-list #progressStrip,
   body.print-shopping-list .panel:not(#results),
   body.print-shopping-list .results-head,
   body.print-shopping-list #planMeta,

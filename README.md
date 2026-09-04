@@ -10,8 +10,9 @@ that runs in any modern browser.
 ## What it does
 
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 22 built-in recipe templates
-  so you don't get the same meal twice in a row.
+  day for a plan of 1–14 days, rotating through 29 built-in recipe templates
+  (a mix of familiar staples and more adventurous options) so you don't get
+  the same meal twice in a row.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient
@@ -80,6 +81,11 @@ that runs in any modern browser.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
+- **Savings history & achievements** — a progress strip (current streak,
+  total saved, plans generated) appears once you've generated at least one
+  plan, and an Achievements dialog tracks milestones (budget streaks, total
+  saved, recipes tried, favorites) — all computed from data already stored
+  locally, nothing new to sign up for.
 
 ## Running it
 

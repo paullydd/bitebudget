@@ -25,6 +25,9 @@ const MEAL_TEMPLATES = [
   { id: "b7", slot: "breakfast", style: "eggs", name: "Egg & Sausage Scramble with Toast",
     items: [{ food: "egg", grams: 120 }, { food: "breakfast_sausage", grams: 60 }, { food: "whole_wheat_bread", grams: 70 }, { food: "bell_pepper", grams: 40 }],
     instructions: ["Brown the breakfast sausage in a pan over medium heat, breaking it up as it cooks.", "Whisk in the eggs and diced bell pepper, scrambling until just set.", "Toast the bread and serve alongside."] },
+  { id: "b8", slot: "breakfast", style: "eggs", name: "Breakfast Burrito",
+    items: [{ food: "egg", grams: 120 }, { food: "cheddar_cheese", grams: 30 }, { food: "tortilla", grams: 60 }, { food: "bell_pepper", grams: 40 }],
+    instructions: ["Scramble the eggs with the diced bell pepper in a lightly oiled pan.", "Warm the tortilla in a dry pan or microwave for 15-20 seconds.", "Fill with the scrambled eggs, top with shredded cheddar, and roll up."] },
 
   // ---------- LUNCH ----------
   { id: "l1", slot: "lunch", style: "bowl", name: "Chicken & Rice Bowl",
@@ -45,6 +48,12 @@ const MEAL_TEMPLATES = [
   { id: "l6", slot: "lunch", style: "bowl", name: "Salmon Spinach Quinoa Bowl",
     items: [{ food: "salmon", grams: 120 }, { food: "spinach", grams: 60 }, { food: "quinoa", grams: 100 }, { food: "olive_oil", grams: 5 }],
     instructions: ["Pan-sear or bake the salmon until it flakes easily.", "Wilt spinach lightly in a warm pan.", "Serve salmon over quinoa and spinach, drizzled with olive oil."] },
+  { id: "l7", slot: "lunch", style: "wrap_sandwich", name: "Turkey & Cheese Sandwich",
+    items: [{ food: "turkey_breast", grams: 90 }, { food: "whole_wheat_bread", grams: 70 }, { food: "cheddar_cheese", grams: 25 }, { food: "carrots", grams: 60 }],
+    instructions: ["Layer the sliced turkey and cheddar between the bread.", "Cut in half.", "Serve with carrot sticks on the side."] },
+  { id: "l8", slot: "lunch", style: "wrap_sandwich", name: "Grilled Cheese & Apple",
+    items: [{ food: "whole_wheat_bread", grams: 70 }, { food: "cheddar_cheese", grams: 40 }, { food: "olive_oil", grams: 5 }, { food: "apple", grams: 120 }],
+    instructions: ["Layer the cheddar between the bread slices.", "Pan-fry in the olive oil over medium heat, a few minutes per side, until golden and the cheese melts.", "Serve with sliced apple on the side."] },
 
   // ---------- DINNER ----------
   { id: "d1", slot: "dinner", style: "bowl", name: "Baked Salmon with Sweet Potato",
@@ -65,6 +74,9 @@ const MEAL_TEMPLATES = [
   { id: "d6", slot: "dinner", style: "bowl", name: "Sweet Potato & Black Bean Bowl",
     items: [{ food: "sweet_potato", grams: 200 }, { food: "black_beans", grams: 150 }, { food: "spinach", grams: 40 }, { food: "avocado", grams: 50 }],
     instructions: ["Roast cubed sweet potato at 400°F for 20-25 minutes.", "Warm the black beans with a pinch of cumin.", "Assemble in a bowl over spinach, topped with sliced avocado."] },
+  { id: "d7", slot: "dinner", style: "bowl", name: "Chicken & Broccoli Pasta",
+    items: [{ food: "pasta", grams: 200 }, { food: "chicken_breast", grams: 130 }, { food: "broccoli", grams: 100 }, { food: "olive_oil", grams: 8 }],
+    instructions: ["Cook pasta according to package instructions.", "Pan-sear the chicken until cooked through, then slice.", "Steam the broccoli, then toss everything together with the pasta and olive oil."] },
 
   // ---------- SNACK ----------
   { id: "s1", slot: "snack", name: "Apple & Almonds",
@@ -82,4 +94,7 @@ const MEAL_TEMPLATES = [
   { id: "s5", slot: "snack", name: "Cheese & Orange",
     items: [{ food: "cheddar_cheese", grams: 30 }, { food: "orange", grams: 130 }],
     instructions: ["Pair sliced cheese with a fresh orange."] },
+  { id: "s6", slot: "snack", name: "PB & Banana Toast",
+    items: [{ food: "whole_wheat_bread", grams: 35 }, { food: "peanut_butter", grams: 20 }, { food: "banana", grams: 100 }],
+    instructions: ["Toast the bread.", "Spread with peanut butter.", "Top with sliced banana."] },
 ];

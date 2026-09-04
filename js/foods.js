@@ -44,6 +44,7 @@ const FOODS = {
   orange:          { name: "Orange",              protein: 0.9,  carbs: 11.8, fat: 0.1,  price: 0.30, veg: true, category: "Produce" },
   bacon:           { name: "Bacon",               protein: 37,   carbs: 1.4,  fat: 42,   price: 1.30, veg: false, category: "Protein", proteinFamily: "red_meat" },
   breakfast_sausage:{name: "Turkey Breakfast Sausage", protein: 14, carbs: 2, fat: 27, price: 1.10, veg: false, category: "Protein", proteinFamily: "poultry" },
+  tortilla:        { name: "Flour Tortilla",      protein: 8,    carbs: 48,   fat: 7,    price: 0.30, veg: true, category: "Pantry & Grains" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.

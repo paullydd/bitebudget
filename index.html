@@ -30,6 +30,8 @@
     <p>Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
   </header>
 
+  <div id="progressStrip" class="progress-strip hidden"></div>
+
   <main>
     <section id="welcomeScreen" class="panel welcome-screen">
       <img src="icons/icon.svg" alt="BiteBudget logo" class="welcome-icon">
@@ -281,6 +283,14 @@
           <ol id="recipeInstructions"></ol>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="achievementsDialog" class="achievements-dialog">
+    <div class="achievements-page">
+      <button type="button" id="achievementsCloseBtn" class="recipe-close" aria-label="Close achievements">✕</button>
+      <h2>🏅 Achievements</h2>
+      <div id="achievementsGrid" class="badge-grid"></div>
     </div>
   </dialog>
 

@@ -7,6 +7,18 @@ const ONBOARDED_KEY = "biteBudget.onboarded.v1";
 const SHOPPING_CHECKED_KEY = "biteBudget.shoppingChecked.v1";
 const THEME_KEY = "biteBudget.theme.v1";
 const FAVORITES_KEY = "biteBudget.favorites.v1";
+const HISTORY_KEY = "biteBudget.history.v1";
+const RECIPES_TRIED_KEY = "biteBudget.recipesTried.v1";
+const BADGES = [
+  { id: "first_plan", icon: "🌱", name: "First Plan", desc: "Generate your first meal plan.", check: s => s.plansGenerated >= 1 },
+  { id: "streak_3", icon: "🔥", name: "On a Roll", desc: "3 plans in a row under budget.", check: s => s.longestStreak >= 3 },
+  { id: "streak_10", icon: "🏆", name: "Budget Master", desc: "10 plans in a row under budget.", check: s => s.longestStreak >= 10 },
+  { id: "saved_50", icon: "💰", name: "Big Saver", desc: "Save $50 total vs. your budget.", check: s => s.totalSaved >= 50 },
+  { id: "saved_200", icon: "💎", name: "Super Saver", desc: "Save $200 total vs. your budget.", check: s => s.totalSaved >= 200 },
+  { id: "explorer_10", icon: "🍽️", name: "Recipe Explorer", desc: "Try 10 different recipes.", check: s => s.recipesTried >= 10 },
+  { id: "explorer_25", icon: "👨‍🍳", name: "Recipe Connoisseur", desc: "Try 25 different recipes.", check: s => s.recipesTried >= 25 },
+  { id: "favorites_5", icon: "❤️", name: "Favorite Fan", desc: "Favorite 5 recipes.", check: s => s.favoritesCount >= 5 },
+];
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const WIZARD_TOTAL_STEPS = 5;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
@@ -341,6 +353,91 @@ function loadPreferences() {
   const favoriteIds = [...loadFavorites()];
   if (!prefs && favoriteIds.length === 0) return undefined;
   return { ...(prefs || {}), favoriteIds };
+}
+
+function loadHistory() {
+  const saved = localStorage.getItem(HISTORY_KEY);
+  return saved ? JSON.parse(saved) : [];
+}
+
+function saveHistory(history) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+// Called when Generate Plan produces a genuinely new plan — starts a new
+// "planning session" row.
+function recordNewHistoryEntry(summary) {
+  const history = loadHistory();
+  history.push({
+    date: new Date().toISOString().slice(0, 10),
+    days: summary.days,
+    totalBudget: summary.totalBudget,
+    totalCost: summary.totalCost,
+  });
+  saveHistory(history);
+}
+
+// Called on Shuffle or a single-meal swap — updates the current session's
+// row in place rather than logging a new one, so refining the same plan
+// doesn't inflate the streak/plan count.
+function updateLatestHistoryEntry(summary) {
+  const history = loadHistory();
+  if (history.length === 0) {
+    recordNewHistoryEntry(summary);
+    return;
+  }
+  const last = history[history.length - 1];
+  last.days = summary.days;
+  last.totalBudget = summary.totalBudget;
+  last.totalCost = summary.totalCost;
+  saveHistory(history);
+}
+
+// Framed as "plans," not "weeks" — a plan can be 1-14 days and the budget
+// period varies, so a weekly cadence isn't something this data can honestly claim.
+function computeHistoryStats(history) {
+  let currentStreak = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].totalCost <= history[i].totalBudget) currentStreak++;
+    else break;
+  }
+
+  let longestStreak = 0, running = 0;
+  history.forEach(h => {
+    if (h.totalCost <= h.totalBudget) {
+      running++;
+      longestStreak = Math.max(longestStreak, running);
+    } else {
+      running = 0;
+    }
+  });
+
+  const totalSaved = history.reduce((s, h) => s + Math.max(0, h.totalBudget - h.totalCost), 0);
+
+  return { plansGenerated: history.length, currentStreak, longestStreak, totalSaved };
+}
+
+function loadRecipesTried() {
+  const saved = localStorage.getItem(RECIPES_TRIED_KEY);
+  return saved ? new Set(JSON.parse(saved)) : new Set();
+}
+
+function saveRecipesTried(tried) {
+  localStorage.setItem(RECIPES_TRIED_KEY, JSON.stringify([...tried]));
+}
+
+function recordRecipesTried(plan) {
+  const tried = loadRecipesTried();
+  plan.forEach(day => day.meals.forEach(m => tried.add(m.id)));
+  saveRecipesTried(tried);
+}
+
+function computeStats() {
+  return {
+    ...computeHistoryStats(loadHistory()),
+    recipesTried: loadRecipesTried().size,
+    favoritesCount: loadFavorites().size,
+  };
 }
 
 function initOnboarding() {
@@ -690,6 +787,40 @@ function renderPlan(result) {
 
   activateDay(activeDayNum);
   $("#results").classList.remove("hidden");
+
+  recordRecipesTried(plan);
+  renderProgressStrip();
+}
+
+// Compact stats strip shown once there's any history — hidden for a
+// brand-new visitor with nothing to show yet.
+function renderProgressStrip() {
+  const history = loadHistory();
+  const strip = $("#progressStrip");
+  if (history.length === 0) {
+    strip.classList.add("hidden");
+    return;
+  }
+  const stats = computeStats();
+  strip.innerHTML = `
+    <div class="progress-stat"><span class="progress-stat-value">${stats.currentStreak}</span><span class="progress-stat-label">Streak</span></div>
+    <div class="progress-stat"><span class="progress-stat-value">${money(stats.totalSaved)}</span><span class="progress-stat-label">Saved</span></div>
+    <div class="progress-stat"><span class="progress-stat-value">${stats.plansGenerated}</span><span class="progress-stat-label">Plans</span></div>
+    <button type="button" id="achievementsBtn" class="secondary-btn">🏅 Achievements</button>`;
+  strip.classList.remove("hidden");
+}
+
+function renderAchievements() {
+  const stats = computeStats();
+  $("#achievementsGrid").innerHTML = BADGES.map(b => {
+    const earned = b.check(stats);
+    return `
+      <div class="badge-card ${earned ? "earned" : "locked"}">
+        <div class="badge-icon">${earned ? b.icon : "🔒"}</div>
+        <div class="badge-name">${b.name}</div>
+        <div class="badge-desc">${b.desc}</div>
+      </div>`;
+  }).join("");
 }
 
 let activeDayNum = 1;
@@ -718,6 +849,7 @@ function init() {
 
   const savedPlan = localStorage.getItem(PLAN_KEY);
   if (savedPlan) renderPlan(JSON.parse(savedPlan));
+  else renderProgressStrip();
 
   $("#planForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -726,6 +858,7 @@ function init() {
     const result = generatePlan(settings, loadPreferences());
     localStorage.removeItem(SHOPPING_CHECKED_KEY);
     activeDayNum = 1;
+    recordNewHistoryEntry(result.summary);
     localStorage.setItem(PLAN_KEY, JSON.stringify(result));
     renderPlan(result);
     $("#results").scrollIntoView({ behavior: "smooth" });
@@ -736,6 +869,7 @@ function init() {
     const result = generatePlan(settings, loadPreferences());
     localStorage.removeItem(SHOPPING_CHECKED_KEY);
     activeDayNum = 1;
+    updateLatestHistoryEntry(result.summary);
     localStorage.setItem(PLAN_KEY, JSON.stringify(result));
     renderPlan(result);
   });
@@ -759,6 +893,7 @@ function init() {
       const dayIndex = Number(swapBtn.dataset.dayIndex);
       const mealIndex = Number(swapBtn.dataset.mealIndex);
       regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences());
+      updateLatestHistoryEntry(currentPlanResult.summary);
       localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
       renderPlan(currentPlanResult);
       return;
@@ -787,6 +922,16 @@ function init() {
     const nowFavorite = toggleFavorite(currentRecipeMealId);
     $("#recipeFavoriteBtn").textContent = nowFavorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
     $("#recipeFavoriteBtn").classList.toggle("active", nowFavorite);
+  });
+
+  $("#progressStrip").addEventListener("click", (e) => {
+    if (!e.target.closest("#achievementsBtn")) return;
+    renderAchievements();
+    $("#achievementsDialog").showModal();
+  });
+  $("#achievementsCloseBtn").addEventListener("click", () => $("#achievementsDialog").close());
+  $("#achievementsDialog").addEventListener("click", (e) => {
+    if (e.target === $("#achievementsDialog")) $("#achievementsDialog").close();
   });
 
   ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian"].forEach(sel => {

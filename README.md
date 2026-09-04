@@ -27,8 +27,10 @@ that runs in any modern browser.
 - **Cookbook-style recipes** — "📖 View Recipe" on any meal opens it as a
   full recipe page (parchment styling, serif type, an ingredients/
   instructions spread with a spine line down the middle) instead of a
-  cramped inline expand — full ingredient list with measurements and
-  step-by-step instructions.
+  cramped inline expand — full ingredient list with measurements, a
+  prep/cook time line, and detailed, numbered steps (specific
+  temperatures, timing, and visual doneness cues, not just "cook until
+  done") so a recipe can actually be followed start to finish.
 - **Shopping list** — aggregates all ingredients across the whole plan into
   one list with quantities and total estimated cost.
 - **Vegetarian filter** and a "shuffle" button to regenerate with more

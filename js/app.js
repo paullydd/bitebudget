@@ -548,6 +548,15 @@ function macroTargetGrams(dailyCalories, split) {
 const money = (n) => `$${n.toFixed(2)}`;
 const grams = (n) => `${Math.round(n)}g`;
 
+// Builds a "⏱ 10 min prep · 12 min cook" segment (or just "⏱ 5 min" when
+// there's nothing to cook) — undefined for custom/logged meals, which have
+// no prepTime/cookTime since they're not a recipe template.
+function formatTime(prepTime, cookTime) {
+  if (prepTime == null || cookTime == null) return "";
+  if (cookTime === 0) return `⏱ ${prepTime} min`;
+  return `⏱ ${prepTime} min prep · ${cookTime} min cook`;
+}
+
 function checkBudgetFeasibility() {
   const dailyCalories = Number($("#calories").value) || 0;
   const snacksPerDay = Number($("#snacks").value) || 1;
@@ -723,7 +732,8 @@ function openRecipeModal(meal) {
   currentRecipeMealId = meal.id;
   $("#recipeSlot").textContent = meal.slot;
   $("#recipeTitle").textContent = meal.name;
-  $("#recipeMacros").textContent = `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)}`;
+  const time = formatTime(meal.prepTime, meal.cookTime);
+  $("#recipeMacros").textContent = `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)}${time ? " · " + time : ""}`;
   const favorite = isFavorite(meal.id);
   $("#recipeFavoriteBtn").textContent = favorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
   $("#recipeFavoriteBtn").classList.toggle("active", favorite);
@@ -837,10 +847,11 @@ function renderPrintBooklet(result) {
               <p class="booklet-meal-macros">Logged by you.</p>
             </div>`;
         }
+        const time = formatTime(m.prepTime, m.cookTime);
         return `
         <div class="booklet-meal">
           <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
-          <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}</p>
+          <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}${time ? " · " + time : ""}</p>
           <div class="booklet-meal-body">
             <div>
               <strong>Ingredients</strong>

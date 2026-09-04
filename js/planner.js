@@ -231,6 +231,7 @@ function generatePlan(settings, preferences) {
 
       dayMeals.push({
         slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
+        prepTime: template.prepTime, cookTime: template.cookTime,
       });
 
       recent[slot].push(template.id);
@@ -282,7 +283,10 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   const items = scaleItems(template.items, factor);
   const nutrition = computeNutrition(items);
 
-  day.meals[mealIndex] = { slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition };
+  day.meals[mealIndex] = {
+    slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
+    prepTime: template.prepTime, cookTime: template.cookTime,
+  };
   recomputeDayTotals(day);
 
   result.shoppingList = buildShoppingList(result.plan);
@@ -327,7 +331,10 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
       factor = Math.min(1.4, Math.max(0.7, factor));
       const items = scaleItems(template.items, factor);
       const nutrition = computeNutrition(items);
-      day.meals[i] = { slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition };
+      day.meals[i] = {
+        slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
+        prepTime: template.prepTime, cookTime: template.cookTime,
+      };
     });
   }
 

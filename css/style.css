@@ -114,6 +114,9 @@ body {
   position: relative;
 }
 .achievements-page h2 { margin: 0 0 20px; text-align: center; }
+.custom-meal-dialog { max-width: 440px; }
+.custom-meal-dialog #customMealForm { display: flex; flex-direction: column; gap: 14px; }
+.custom-meal-dialog .primary-btn { width: 100%; }
 .badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
 .badge-card {
   border: 1px solid var(--border);
@@ -446,7 +449,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .meal-slot { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
 .meal-name { font-weight: 700; }
 .meal-cost { margin-left: auto; font-weight: 700; color: var(--accent-dark); }
-.meal-swap-btn, .favorite-btn {
+.meal-swap-btn, .favorite-btn, .custom-meal-btn {
   border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 8px;
@@ -455,9 +458,13 @@ form { display: flex; flex-direction: column; gap: 16px; }
   cursor: pointer;
   line-height: 1;
 }
-.meal-swap-btn:hover, .favorite-btn:hover { background: var(--hover-bg); }
+.meal-swap-btn:hover, .favorite-btn:hover, .custom-meal-btn:hover { background: var(--hover-bg); }
 .favorite-btn.active { border-color: var(--bad); }
 .meal-macros { display: flex; gap: 12px; margin: 10px 0; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
+.custom-meal-card { border-left: 3px solid var(--accent); }
+.pending-meal-card { border-style: dashed; background: transparent; }
+.pending-meal-note { color: var(--muted); font-size: 0.85rem; margin: 10px 0; }
+.pending-meal-card .custom-meal-btn { width: 100%; text-align: center; }
 .recipe-btn {
   border: 1px solid var(--border);
   background: var(--panel);
@@ -508,6 +515,11 @@ form { display: flex; flex-direction: column; gap: 16px; }
   line-height: 1;
 }
 .recipe-close:hover { background: rgba(0, 0, 0, 0.14); }
+/* Theme-aware dialogs (achievements, custom meal) sit on --panel, not the
+   recipe modal's fixed parchment background, so their close button needs
+   theme tokens instead — otherwise it's near-invisible in dark mode. */
+.achievements-page .recipe-close { background: var(--hover-bg); color: var(--ink); }
+.achievements-page .recipe-close:hover { background: var(--border); }
 .recipe-header { text-align: center; margin-bottom: 26px; padding-bottom: 20px; border-bottom: 3px double #cabf9e; }
 .recipe-slot {
   font-family: "Segoe UI", system-ui, sans-serif;

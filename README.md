@@ -47,11 +47,19 @@ that runs in any modern browser.
   rotating funny quote, "Get Started" / "Skip setup for now") leads into a
   skippable, Spotify-style wizard: liked
   *and disliked* proteins (tap a protein once to like it, again to say "not
-  for me," a third time to clear it) → meal style per meal → your calorie
-  target → your grocery budget → your all-time go-to meal. Likes and
-  dislikes both bias meal selection (dislikes strongly, but never to a hard
-  ban) without turning into a filter — variety is still preserved. Revisit
-  anytime via the "🎯 Preferences" button in the header.
+  for me," a third time to clear it) → up to 3 meal styles per meal (or "no
+  preference") → your calorie target → your grocery budget → your all-time
+  go-to meal. Likes and dislikes both bias meal selection (dislikes
+  strongly, but never to a hard ban) without turning into a filter —
+  variety is still preserved. Revisit anytime via the "🎯 Preferences"
+  button in the header.
+- **Log your own meal** — a 📝 button on any meal card lets you swap it for
+  something you're actually eating: type a name and protein/carbs/fat (cost
+  optional), and the rest of that day's meals automatically recalculate to
+  still land near your calorie target. Going out and don't know what you'll
+  order yet? Check "Leave this open" instead — it becomes a placeholder you
+  fill in later without disturbing anything else in the plan. A logged meal
+  can always be reverted to an auto-picked one with ↩️.
 - **Slide-or-type controls** — calorie target and budget amount can be set
   with a slider or typed directly, in both the onboarding wizard and the
   Settings panel; the budget slider's range adapts to whichever period
@@ -162,7 +170,12 @@ daily cost (cheapest eligible template per slot, same scaling bounds) — this
 is what powers the budget feasibility warning. `regenerateMeal()` reuses the
 same per-slot logic to reroll exactly one meal in place (the 🔀 button),
 then rebuilds the day's totals and the shopping list so nothing drifts out
-of sync.
+of sync. `applyCustomMeal()` drops a user-entered meal into one slot and,
+when it's the first time that slot is going from auto-picked to a *known*
+custom meal, re-picks every other still-auto-picked slot in that day so the
+day's calorie total still aims for the same target around the fixed meal —
+re-editing an already-custom meal, or leaving one open to fill in later,
+never re-triggers that rebalance.
 
 ## Project structure
 

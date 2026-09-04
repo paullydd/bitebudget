@@ -63,7 +63,7 @@
 
       <div class="wizard-step" data-step="2">
         <h3>How do you like your meals put together?</h3>
-        <p class="wizard-hint">Pick one style per meal, or leave it at "No preference."</p>
+        <p class="wizard-hint">Pick up to 3 styles per meal, or leave it at "No preference."</p>
 
         <div class="wizard-slot">
           <div class="wizard-slot-label">Breakfast</div>
@@ -283,6 +283,42 @@
           <ol id="recipeInstructions"></ol>
         </div>
       </div>
+    </div>
+  </dialog>
+
+  <dialog id="customMealDialog" class="achievements-dialog custom-meal-dialog">
+    <div class="achievements-page">
+      <button type="button" id="customMealCloseBtn" class="recipe-close" aria-label="Close">✕</button>
+      <h2 id="customMealTitle">Add your own meal</h2>
+      <form id="customMealForm">
+        <div class="form-row">
+          <label for="customMealName">Meal name</label>
+          <input type="text" id="customMealName" placeholder="e.g. Chipotle bowl">
+        </div>
+        <div class="macro-inputs">
+          <div class="macro-field">
+            <span class="macro-field-label">Protein (g)</span>
+            <input type="number" id="customMealProtein" min="0" value="0">
+          </div>
+          <div class="macro-field">
+            <span class="macro-field-label">Carbs (g)</span>
+            <input type="number" id="customMealCarbs" min="0" value="0">
+          </div>
+          <div class="macro-field">
+            <span class="macro-field-label">Fat (g)</span>
+            <input type="number" id="customMealFat" min="0" value="0">
+          </div>
+        </div>
+        <p id="customMealCalories" class="macro-hint">0 kcal</p>
+        <div class="form-row">
+          <label for="customMealCost">Cost ($, optional)</label>
+          <input type="number" id="customMealCost" min="0" step="0.01" value="0">
+        </div>
+        <div class="form-row checkbox-row">
+          <label><input type="checkbox" id="customMealOpen"> Leave this open — I'll fill it in later</label>
+        </div>
+        <button type="submit" class="primary-btn">Save</button>
+      </form>
     </div>
   </dialog>
 

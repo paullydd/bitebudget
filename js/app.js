@@ -146,12 +146,27 @@ function applyBudgetSliderRange(rangeSel, numberSel, period) {
 
 let wizardStep = 1;
 
-function wireBubbleGroup(container, mode) {
+function wireBubbleGroup(container, mode, options = {}) {
+  const max = options.max || Infinity;
   container.addEventListener("click", (e) => {
     const btn = e.target.closest(".bubble");
     if (!btn) return;
     if (mode === "multi") {
       btn.classList.toggle("selected");
+    } else if (mode === "multi-limited") {
+      // "No preference" is exclusive with everything else in the group;
+      // otherwise toggle, capped at `max` simultaneous picks.
+      if (btn.dataset.value === "no_preference") {
+        [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
+        return;
+      }
+      const noPref = container.querySelector('.bubble[data-value="no_preference"]');
+      if (noPref) noPref.classList.remove("selected");
+      if (btn.classList.contains("selected")) {
+        btn.classList.remove("selected");
+      } else if (container.querySelectorAll(".bubble.selected").length < max) {
+        btn.classList.add("selected");
+      }
     } else if (mode === "tristate") {
       if (btn.classList.contains("selected")) {
         btn.classList.remove("selected");
@@ -233,10 +248,13 @@ function prefillOnboarding(prefs) {
       const b = document.querySelector(`#proteinBubbles .bubble[data-value="${v}"]`);
       if (b) b.classList.add("disliked");
     });
-    Object.entries(prefs.mealStyle || {}).forEach(([slot, val]) => {
+    Object.entries(prefs.mealStyle || {}).forEach(([slot, vals]) => {
       const groupId = STYLE_GROUP_IDS[slot];
-      const b = groupId && document.querySelector(`#${groupId} .bubble[data-value="${val}"]`);
-      if (b) b.classList.add("selected");
+      if (!groupId) return;
+      [].concat(vals).forEach(val => {
+        const b = document.querySelector(`#${groupId} .bubble[data-value="${val}"]`);
+        if (b) b.classList.add("selected");
+      });
     });
     if (prefs.signature) {
       if (prefs.signature.slot) {
@@ -269,8 +287,10 @@ function collectPreferences() {
 
   const mealStyle = {};
   Object.entries(STYLE_GROUP_IDS).forEach(([slot, groupId]) => {
-    const sel = document.querySelector(`#${groupId} .bubble.selected`);
-    if (sel && sel.dataset.value !== "no_preference") mealStyle[slot] = sel.dataset.value;
+    const sel = [...document.querySelectorAll(`#${groupId} .bubble.selected`)]
+      .map(b => b.dataset.value)
+      .filter(v => v !== "no_preference");
+    if (sel.length) mealStyle[slot] = sel;
   });
 
   const sigSlotBtn = document.querySelector("#signatureSlot .bubble.selected");
@@ -428,7 +448,7 @@ function saveRecipesTried(tried) {
 
 function recordRecipesTried(plan) {
   const tried = loadRecipesTried();
-  plan.forEach(day => day.meals.forEach(m => tried.add(m.id)));
+  plan.forEach(day => day.meals.forEach(m => { if (!m.custom) tried.add(m.id); }));
   saveRecipesTried(tried);
 }
 
@@ -442,7 +462,7 @@ function computeStats() {
 
 function initOnboarding() {
   wireBubbleGroup($("#proteinBubbles"), "tristate");
-  Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), "single"));
+  Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), "multi-limited", { max: 3 }));
   wireBubbleGroup($("#signatureSlot"), "single");
   wireBubbleGroup($("#signaturePreset"), "single");
 
@@ -548,18 +568,41 @@ function slotIcon(slot) {
 }
 
 function renderMealCard(meal, dayIndex, mealIndex) {
+  if (meal.custom && meal.pending) {
+    return `
+      <div class="meal-card pending-meal-card">
+        <div class="meal-head">
+          <span class="meal-icon">${slotIcon(meal.slot)}</span>
+          <div>
+            <div class="meal-slot">${meal.slot}</div>
+            <div class="meal-name">${meal.name}</div>
+          </div>
+        </div>
+        <p class="pending-meal-note">Left open — add what you had once you know.</p>
+        <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}">✏️ Fill this in</button>
+      </div>`;
+  }
+
   const n = meal.nutrition;
-  const favorite = isFavorite(meal.id);
+  const favorite = !meal.custom && isFavorite(meal.id);
+  const actionButtons = meal.custom
+    ? `
+        <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Edit this meal" title="Edit this meal">✏️</button>
+        <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Replace with an auto-picked meal" title="Replace with an auto-picked meal">↩️</button>`
+    : `
+        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="Favorite this meal" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
+        <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
+        <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Log your own meal instead" title="Log your own meal instead">📝</button>`;
+
   return `
-    <div class="meal-card">
+    <div class="meal-card ${meal.custom ? "custom-meal-card" : ""}">
       <div class="meal-head">
         <span class="meal-icon">${slotIcon(meal.slot)}</span>
         <div>
           <div class="meal-slot">${meal.slot}</div>
           <div class="meal-name">${meal.name}</div>
         </div>
-        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="Favorite this meal" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
-        <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
+        ${actionButtons}
         <div class="meal-cost">${money(n.cost)}</div>
       </div>
       <div class="meal-macros">
@@ -568,7 +611,7 @@ function renderMealCard(meal, dayIndex, mealIndex) {
         <span>C ${grams(n.carbs)}</span>
         <span>F ${grams(n.fat)}</span>
       </div>
-      <button type="button" class="recipe-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}">📖 View Recipe</button>
+      ${meal.custom ? "" : `<button type="button" class="recipe-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}">📖 View Recipe</button>`}
     </div>`;
 }
 
@@ -596,6 +639,35 @@ function renderNutritionLabel(n) {
       <div class="nutrition-rule thick"></div>
       <div class="nutrition-footnote">*Percent Daily Values are based on a 2,000 calorie diet.</div>
     </div>`;
+}
+
+let customMealTarget = null; // { dayIndex, mealIndex, wasCustom }
+
+function updateCustomMealCalories() {
+  const p = Number($("#customMealProtein").value) || 0;
+  const c = Number($("#customMealCarbs").value) || 0;
+  const f = Number($("#customMealFat").value) || 0;
+  $("#customMealCalories").textContent = `${Math.round(p * 4 + c * 4 + f * 9)} kcal`;
+}
+
+// Opens the "log your own meal" dialog for one slot — pre-filled with its
+// current values when re-editing an already-custom meal, blank otherwise.
+function openCustomMealDialog(dayIndex, mealIndex) {
+  const meal = currentPlanResult.plan[dayIndex].meals[mealIndex];
+  customMealTarget = { dayIndex, mealIndex, wasCustom: !!meal.custom };
+
+  $("#customMealTitle").textContent = meal.pending
+    ? `Fill in your ${meal.slot}`
+    : meal.custom ? `Edit your ${meal.slot}` : `Add your own ${meal.slot}`;
+  const known = meal.custom && !meal.pending;
+  $("#customMealName").value = known ? meal.name : "";
+  $("#customMealProtein").value = known ? Math.round(meal.nutrition.protein) : 0;
+  $("#customMealCarbs").value = known ? Math.round(meal.nutrition.carbs) : 0;
+  $("#customMealFat").value = known ? Math.round(meal.nutrition.fat) : 0;
+  $("#customMealCost").value = known ? meal.nutrition.cost.toFixed(2) : 0;
+  $("#customMealOpen").checked = false;
+  updateCustomMealCalories();
+  $("#customMealDialog").showModal();
 }
 
 let currentRecipeMealId = null;
@@ -704,7 +776,23 @@ function renderPrintBooklet(result) {
   const days = plan.map(day => `
     <div class="booklet-day">
       <h2>Day ${day.day}</h2>
-      ${day.meals.map(m => `
+      ${day.meals.map(m => {
+        if (m.custom && m.pending) {
+          return `
+            <div class="booklet-meal">
+              <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
+              <p class="booklet-meal-macros">Left open — not yet logged.</p>
+            </div>`;
+        }
+        if (m.custom) {
+          return `
+            <div class="booklet-meal">
+              <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
+              <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}</p>
+              <p class="booklet-meal-macros">Logged by you.</p>
+            </div>`;
+        }
+        return `
         <div class="booklet-meal">
           <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
           <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}</p>
@@ -718,7 +806,8 @@ function renderPrintBooklet(result) {
               <ol>${m.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
             </div>
           </div>
-        </div>`).join("")}
+        </div>`;
+      }).join("")}
     </div>`).join("");
 
   return header + days;
@@ -907,6 +996,12 @@ function init() {
       return;
     }
 
+    const customBtn = e.target.closest(".custom-meal-btn");
+    if (customBtn) {
+      openCustomMealDialog(Number(customBtn.dataset.dayIndex), Number(customBtn.dataset.mealIndex));
+      return;
+    }
+
     const favoriteBtn = e.target.closest(".favorite-btn");
     if (favoriteBtn) {
       toggleFavorite(favoriteBtn.dataset.templateId);
@@ -922,6 +1017,47 @@ function init() {
     const nowFavorite = toggleFavorite(currentRecipeMealId);
     $("#recipeFavoriteBtn").textContent = nowFavorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
     $("#recipeFavoriteBtn").classList.toggle("active", nowFavorite);
+  });
+
+  $("#customMealCloseBtn").addEventListener("click", () => $("#customMealDialog").close());
+  $("#customMealDialog").addEventListener("click", (e) => {
+    if (e.target === $("#customMealDialog")) $("#customMealDialog").close();
+  });
+  ["#customMealProtein", "#customMealCarbs", "#customMealFat"].forEach(sel => {
+    $(sel).addEventListener("input", updateCustomMealCalories);
+  });
+  $("#customMealForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (!customMealTarget || !currentPlanResult) return;
+    const { dayIndex, mealIndex, wasCustom } = customMealTarget;
+    const slot = currentPlanResult.plan[dayIndex].meals[mealIndex].slot;
+    const leaveOpen = $("#customMealOpen").checked;
+    const name = $("#customMealName").value.trim();
+
+    let customMeal;
+    if (leaveOpen) {
+      customMeal = {
+        slot, id: `custom-${Date.now()}`, name: name || "Eating out", items: [], instructions: [],
+        custom: true, pending: true, nutrition: { cal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 },
+      };
+    } else {
+      const protein = Math.max(0, Number($("#customMealProtein").value) || 0);
+      const carbs = Math.max(0, Number($("#customMealCarbs").value) || 0);
+      const fat = Math.max(0, Number($("#customMealFat").value) || 0);
+      const cost = Math.max(0, Number($("#customMealCost").value) || 0);
+      const cal = protein * 4 + carbs * 4 + fat * 9;
+      customMeal = {
+        slot, id: `custom-${Date.now()}`, name: name || "Custom meal", items: [], instructions: [],
+        custom: true, pending: false, nutrition: { cal, protein, carbs, fat, cost },
+      };
+    }
+
+    const rebalance = !wasCustom && !leaveOpen;
+    applyCustomMeal(currentPlanResult, dayIndex, mealIndex, customMeal, readSettings(), loadPreferences(), rebalance);
+    updateLatestHistoryEntry(currentPlanResult.summary);
+    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
+    renderPlan(currentPlanResult);
+    $("#customMealDialog").close();
   });
 
   $("#progressStrip").addEventListener("click", (e) => {

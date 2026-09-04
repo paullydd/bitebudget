@@ -37,7 +37,7 @@ function preferenceWeight(template, slot, preferences) {
   if (preferences.proteins && preferences.proteins.some(p => families.includes(p))) {
     weight += 2;
   }
-  if (preferences.mealStyle && preferences.mealStyle[slot] && preferences.mealStyle[slot] === template.style) {
+  if (preferences.mealStyle && preferences.mealStyle[slot] && [].concat(preferences.mealStyle[slot]).includes(template.style)) {
     weight += 2;
   }
   if (preferences.signature && preferences.signature.slot === slot && preferences.signature.preset) {
@@ -268,6 +268,53 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   day.meals[mealIndex] = { slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition };
   recomputeDayTotals(day);
 
+  result.shoppingList = buildShoppingList(result.plan);
+  result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
+  return result;
+}
+
+// Drops a user-entered meal (known macros, or an open "fill in later"
+// placeholder — see js/app.js's customMeal shape) into one slot of an
+// already-generated plan. When rebalance is true, every *other* still
+// auto-picked slot in that day is re-picked so the day's calorie total
+// still aims for the same target around the fixed meal — custom/pending
+// meals elsewhere in the day are left untouched either way.
+function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, preferences, rebalance) {
+  const { dailyCalories, macroSplit, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
+  const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
+  const snackPct = 0.10 / Math.max(1, settings.snacksPerDay);
+  const weightOf = (slot) => (slot === "snack" ? snackPct : slotPct[slot]);
+
+  const day = result.plan[dayIndex];
+  day.meals[mealIndex] = customMeal;
+
+  if (rebalance) {
+    const spentCal = day.meals.filter(m => m.custom).reduce((s, m) => s + m.nutrition.cal, 0);
+    const openSlots = day.meals.map((m, i) => ({ m, i })).filter(({ m }) => !m.custom);
+    const totalWeight = openSlots.reduce((s, { m }) => s + weightOf(m.slot), 0);
+    const remainingCal = Math.max(0, dailyCalories - spentCal);
+    const overBudget = day.totals ? day.totals.cost > dailyBudget : false;
+
+    openSlots.forEach(({ m, i }) => {
+      const share = totalWeight > 0 ? weightOf(m.slot) / totalWeight : 1 / openSlots.length;
+      const targetCal = remainingCal * share;
+
+      const nearbyDays = result.plan.filter((d, di) => Math.abs(di - dayIndex) <= 3 && di !== dayIndex);
+      const avoidIds = nearbyDays.flatMap(d => d.meals.filter(mm => mm.slot === m.slot && !mm.custom).map(mm => mm.id));
+      avoidIds.push(m.id);
+
+      const template = pickTemplate(m.slot, avoidIds, vegetarianOnly, overBudget, preferences, macroSplit);
+      const base = computeNutrition(template.items);
+      let factor = base.cal > 0 ? targetCal / base.cal : 1;
+      factor = Math.min(1.4, Math.max(0.7, factor));
+      const items = scaleItems(template.items, factor);
+      const nutrition = computeNutrition(items);
+      day.meals[i] = { slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition };
+    });
+  }
+
+  recomputeDayTotals(day);
   result.shoppingList = buildShoppingList(result.plan);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
   return result;

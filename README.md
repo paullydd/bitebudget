@@ -10,13 +10,16 @@ that runs in any modern browser.
 ## What it does
 
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 29 built-in recipe templates
+  day for a plan of 1–14 days, rotating through 31 built-in recipe templates
   (a mix of familiar staples and more adventurous options) so you don't get
   the same meal twice in a row.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient
-  quantities.
+  quantities. The split isn't just a label: the planner actively favors
+  meals whose own protein/carb/fat ratio is close to your target (see
+  "How the planner works" below), so a high-protein split actually results
+  in high-protein meals instead of just tracking whatever gets picked.
 - **Budget tracking** — set a daily, weekly, or monthly grocery budget. Each
   day and the whole plan show estimated cost vs. budget, and the planner
   actively favors cheaper meals once you're tracking over budget.
@@ -138,13 +141,16 @@ you:
    30%, dinner 35%, snacks 10% split across however many you chose).
 2. For each slot, filters to templates you haven't had in the last 3 days,
    then to the cheaper half of those when you're pacing over budget, then
-   picks a *weighted* random choice from what's left — templates matching
+   narrows to the closest-fitting quarter by comparing each template's own
+   protein/carb/fat ratio to your macro split (so a 40/30/30 high-protein
+   target actually results in high-protein meals, not just a label) — then
+   picks a *weighted* random choice from what's left. Templates matching
    your saved taste preferences (liked proteins, preferred meal style, your
-   signature meal, or a ❤️ favorite) get a higher weight, and templates
-   matching a *disliked* protein get a strong penalty (rare, never zero) —
-   but everything can still appear. Skipping the preference wizard (and
-   never favoriting anything) means every weight is equal, which is
-   mathematically identical to a plain uniform pick.
+   signature meal, or a ❤️ favorite) get a higher weight within that set, and
+   templates matching a *disliked* protein get a strong penalty (rare, never
+   zero) — but everything can still appear. Skipping the preference wizard
+   (and never favoriting anything) means preference weight is equal for
+   everyone, so only the macro-fit narrowing applies.
 3. Scales the chosen template's ingredient quantities toward the slot's
    calorie target (bounded to 0.7x–1.4x so portions stay realistic), and
    computes nutrition + cost.

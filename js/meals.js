@@ -28,6 +28,12 @@ const MEAL_TEMPLATES = [
   { id: "b8", slot: "breakfast", style: "eggs", name: "Breakfast Burrito",
     items: [{ food: "egg", grams: 120 }, { food: "cheddar_cheese", grams: 30 }, { food: "tortilla", grams: 60 }, { food: "bell_pepper", grams: 40 }],
     instructions: ["Scramble the eggs with the diced bell pepper in a lightly oiled pan.", "Warm the tortilla in a dry pan or microwave for 15-20 seconds.", "Fill with the scrambled eggs, top with shredded cheddar, and roll up."] },
+  { id: "b9", slot: "breakfast", style: "eggs", name: "Turkey & Egg Power Scramble",
+    items: [{ food: "turkey_breast", grams: 90 }, { food: "egg", grams: 100 }, { food: "whole_wheat_bread", grams: 40 }, { food: "spinach", grams: 40 }],
+    instructions: ["Dice and sear the turkey breast in a lightly oiled pan until browned and cooked through.", "Add the eggs and spinach, scrambling until just set.", "Serve with a slice of toast on the side."] },
+  { id: "b10", slot: "breakfast", style: "eggs", name: "Savory Chicken Breakfast Skillet",
+    items: [{ food: "chicken_breast", grams: 100 }, { food: "egg", grams: 80 }, { food: "bell_pepper", grams: 60 }],
+    instructions: ["Season and pan-sear the diced chicken breast until cooked through.", "Push to one side, scramble in the eggs and diced bell pepper.", "Combine and serve hot."] },
 
   // ---------- LUNCH ----------
   { id: "l1", slot: "lunch", style: "bowl", name: "Chicken & Rice Bowl",

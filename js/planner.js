@@ -59,6 +59,28 @@ function preferenceWeight(template, slot, preferences) {
   return weight;
 }
 
+// How far a template's own protein/carb/fat ratio is from the daily macro
+// split. Manhattan distance between two ratios that each sum to 1, so it
+// ranges 0 (identical split) to 2 (completely disjoint).
+function macroDistance(template, macroSplit) {
+  const n = computeNutrition(template.items);
+  if (n.cal <= 0) return 2;
+  const proteinPct = (n.protein * 4) / n.cal;
+  const carbPct = (n.carbs * 4) / n.cal;
+  const fatPct = (n.fat * 9) / n.cal;
+  return Math.abs(proteinPct - macroSplit.protein / 100)
+    + Math.abs(carbPct - macroSplit.carbs / 100)
+    + Math.abs(fatPct - macroSplit.fat / 100);
+}
+
+// Fine-grained weighting within an already macro-filtered candidate set (see
+// pickTemplate) — additive bias like preferenceWeight, not what does the
+// heavy lifting on its own.
+function macroFitWeight(template, macroSplit) {
+  if (!macroSplit) return 0;
+  return Math.max(0, 8 - macroDistance(template, macroSplit) * 5);
+}
+
 function weightedPick(candidates, weights) {
   const total = weights.reduce((s, w) => s + w, 0);
   let roll = Math.random() * total;
@@ -69,10 +91,14 @@ function weightedPick(candidates, weights) {
   return candidates[candidates.length - 1];
 }
 
-// Pick a template for a slot: filters for variety (avoid recent repeats) and
-// budget (bias toward the cheaper half when over), then weights the remaining
-// candidates by how well they match stated taste preferences.
-function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences) {
+// Pick a template for a slot: filters for variety (avoid recent repeats),
+// budget (bias toward the cheaper half when over), and macro fit (narrow to
+// the better-fitting half of what's left when a split is set — the same
+// filter-then-weight pattern budget-awareness uses, so a real nutritional
+// target does more than nudge among many other signals), then weights the
+// remaining candidates by how well they match stated taste preferences and
+// fine-grained macro fit within that narrowed set.
+function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, macroSplit) {
   let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
   if (vegetarianOnly) pool = pool.filter(t => isVegetarian(t.items));
   let fresh = pool.filter(t => !recentIds.includes(t.id));
@@ -81,10 +107,19 @@ function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences) 
   // Rank by base cost; when over budget, bias toward the cheaper half.
   const withCost = fresh.map(t => ({ t, cost: computeNutrition(t.items).cost }));
   withCost.sort((a, b) => a.cost - b.cost);
-  const candidates = overBudget ? withCost.slice(0, Math.max(1, Math.ceil(withCost.length / 2))) : withCost;
+  let candidates = overBudget ? withCost.slice(0, Math.max(1, Math.ceil(withCost.length / 2))) : withCost;
+
+  // Narrow further to the closest-fitting quarter when a split is set —
+  // tighter than the budget filter's half, since a stated macro target
+  // (e.g. a high-protein diet) is a stronger signal than a soft cost nudge.
+  if (macroSplit) {
+    const withFit = candidates.map(c => ({ ...c, distance: macroDistance(c.t, macroSplit) }));
+    withFit.sort((a, b) => a.distance - b.distance);
+    candidates = withFit.slice(0, Math.max(1, Math.round(withFit.length * 0.25)));
+  }
 
   const templates = candidates.map(c => c.t);
-  const weights = templates.map(t => preferenceWeight(t, slot, preferences));
+  const weights = templates.map(t => preferenceWeight(t, slot, preferences) + macroFitWeight(t, macroSplit));
   return weightedPick(templates, weights);
 }
 
@@ -169,7 +204,7 @@ function generatePlan(settings, preferences) {
     for (const slot of slotsToday) {
       const pct = slot === "snack" ? snackPct : slotPct[slot];
       const targetCal = dailyCalories * pct;
-      const template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences);
+      const template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, macroSplit);
 
       const base = computeNutrition(template.items);
       let factor = base.cal > 0 ? targetCal / base.cal : 1;
@@ -206,7 +241,7 @@ function generatePlan(settings, preferences) {
 // used during initial generation, so preference weighting, dislikes, and
 // budget-awareness all apply identically to a manual swap.
 function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
-  const { dailyCalories, snacksPerDay, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const { dailyCalories, macroSplit, snacksPerDay, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
@@ -222,7 +257,7 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   avoidIds.push(oldMeal.id);
 
   const overBudget = day.totals.cost > dailyBudget;
-  const template = pickTemplate(slot, avoidIds, vegetarianOnly, overBudget, preferences);
+  const template = pickTemplate(slot, avoidIds, vegetarianOnly, overBudget, preferences, macroSplit);
 
   const base = computeNutrition(template.items);
   let factor = base.cal > 0 ? targetCal / base.cal : 1;

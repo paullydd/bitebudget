@@ -213,14 +213,17 @@ function selectPrepPool(slot, count, vegetarianOnly, preferences, macroSplit) {
   return pool;
 }
 
-// Groups a plan's meals by recipe — turns "same recipe on days 1, 3, 5"
-// into one "cook once, makes N servings" card for the prep-batch view.
-// Custom/logged meals are skipped since there's no template to batch.
+// Groups a plan's meals by recipe, for the prep-batch view — turns "same
+// recipe on days 1, 3, 5" into one "cook once, makes N servings" card.
+// Only meals actually assigned via meal prep (m.prepped, set in the day
+// loop above) count — a custom meal, or a recipe that coincidentally
+// repeats later from ordinary variety-picking, isn't something the user
+// asked to batch-cook, so it's excluded even if the id matches.
 function groupIntoPrepBatches(plan) {
   const groups = {};
   plan.forEach(day => {
     day.meals.forEach(m => {
-      if (m.custom) return;
+      if (!m.prepped) return;
       if (!groups[m.id]) {
         groups[m.id] = { id: m.id, name: m.name, slot: m.slot, instructions: m.instructions, occurrences: 0, itemTotals: {}, cost: 0 };
       }
@@ -232,20 +235,23 @@ function groupIntoPrepBatches(plan) {
       });
     });
   });
-  return Object.values(groups).map(g => ({
-    id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, occurrences: g.occurrences, cost: g.cost,
-    items: Object.entries(g.itemTotals).map(([food, grams]) => ({ food, grams })),
-  }));
+  return Object.values(groups)
+    .map(g => ({
+      id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, occurrences: g.occurrences, cost: g.cost,
+      items: Object.entries(g.itemTotals).map(([food, grams]) => ({ food, grams })),
+    }));
 }
 
 // Build a full multi-day plan. preferences (see foods.js/meals.js tags) is
-// optional — omitting it reproduces the original untargeted behavior. When
-// settings.mealPrepMode is set, each slot rotates through a small fixed
-// pool (see selectPrepPool) instead of picking fresh every day.
+// optional — omitting it reproduces the original untargeted behavior.
+// settings.mealPrep ({breakfast, lunch, dinner}, each a 0-7 count) fixes
+// one recipe per named slot for that many occurrences — "prep lunch 4
+// times" cooks one lunch recipe once and reuses it for the first 4 days;
+// the remaining days (and any slot left at 0) pick fresh as usual.
 function generatePlan(settings, preferences) {
   const {
     days, dailyCalories, macroSplit, budgetPeriod, budgetAmount,
-    snacksPerDay, vegetarianOnly, mealPrepMode,
+    snacksPerDay, vegetarianOnly, mealPrep,
   } = settings;
 
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
@@ -253,11 +259,14 @@ function generatePlan(settings, preferences) {
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
 
   const recent = { breakfast: [], lunch: [], dinner: [], snack: [] };
-  const prepPools = mealPrepMode
-    ? Object.fromEntries(["breakfast", "lunch", "dinner", "snack"].map(slot =>
-        [slot, selectPrepPool(slot, 2, vegetarianOnly, preferences, macroSplit)]))
-    : null;
-  const prepCounters = { breakfast: 0, lunch: 0, dinner: 0, snack: 0 };
+  const prepRemaining = {};
+  ["breakfast", "lunch", "dinner"].forEach(slot => {
+    const count = Math.min(days, Math.max(0, (mealPrep && mealPrep[slot]) || 0));
+    if (count > 0) {
+      const [template] = selectPrepPool(slot, 1, vegetarianOnly, preferences, macroSplit);
+      prepRemaining[slot] = { template, remaining: count };
+    }
+  });
 
   const plan = [];
   let runningCost = 0;
@@ -272,10 +281,12 @@ function generatePlan(settings, preferences) {
       const targetCal = dailyCalories * pct;
 
       let template;
-      if (mealPrepMode) {
-        const pool = prepPools[slot];
-        template = pool[prepCounters[slot] % pool.length];
-        prepCounters[slot]++;
+      let prepped = false;
+      const prep = prepRemaining[slot];
+      if (prep && prep.remaining > 0) {
+        template = prep.template;
+        prep.remaining--;
+        prepped = true;
       } else {
         template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, macroSplit);
       }
@@ -288,13 +299,11 @@ function generatePlan(settings, preferences) {
 
       dayMeals.push({
         slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
-        prepTime: template.prepTime, cookTime: template.cookTime,
+        prepTime: template.prepTime, cookTime: template.cookTime, prepped,
       });
 
-      if (!mealPrepMode) {
-        recent[slot].push(template.id);
-        if (recent[slot].length > 3) recent[slot].shift();
-      }
+      recent[slot].push(template.id);
+      if (recent[slot].length > 3) recent[slot].shift();
     }
 
     const day = { day: d + 1, meals: dayMeals, totals: null };
@@ -309,7 +318,11 @@ function generatePlan(settings, preferences) {
 
   return {
     plan, shoppingList,
-    summary: { totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly, mealPrepMode: !!mealPrepMode },
+    summary: {
+      totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly,
+      mealPrep: mealPrep || { breakfast: 0, lunch: 0, dinner: 0 },
+      mealPrepEnabled: Object.keys(prepRemaining).length > 0,
+    },
   };
 }
 

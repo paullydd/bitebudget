@@ -28,7 +28,7 @@ const BADGES = [
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const SLOT_ORDER = ["breakfast", "lunch", "dinner", "snack"];
 const PREP_STORAGE_NOTE = "Store in airtight containers in the fridge up to 4 days, or freeze up to 3 months. Reheat covered until steaming.";
-const WIZARD_TOTAL_STEPS = 5;
+const WIZARD_TOTAL_STEPS = 6;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
 const BUDGET_SLIDER_RANGES = {
   daily: { min: 5, max: 150, step: 5 },
@@ -287,6 +287,18 @@ function prefillOnboarding(prefs) {
   if (periodBtn) periodBtn.classList.add("selected");
   $("#obBudgetAmount").value = $("#budgetAmount").value;
   applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", period);
+
+  // Meal prep isn't part of PREFS_KEY either — same seed-from-Settings
+  // approach, plus setting the Yes/No bubble and reveal state to match.
+  const prepBreakfast = $("#prepBreakfast").value;
+  const prepLunch = $("#prepLunch").value;
+  const prepDinner = $("#prepDinner").value;
+  $("#obPrepBreakfast").value = prepBreakfast;
+  $("#obPrepLunch").value = prepLunch;
+  $("#obPrepDinner").value = prepDinner;
+  const anyPrep = [prepBreakfast, prepLunch, prepDinner].some(v => Number(v) > 0);
+  document.querySelector(`#obMealPrepYesNo .bubble[data-value="${anyPrep ? "yes" : "no"}"]`)
+    ?.dispatchEvent(new Event("click", { bubbles: true }));
 }
 
 function collectPreferences() {
@@ -321,10 +333,10 @@ function collectPreferences() {
   };
 }
 
-// Copies the wizard's calorie/budget-period/budget answers into the real
+// Copies the wizard's calorie/budget/meal-prep answers into the real
 // Settings fields (and their sliders), matching Settings' own lazy-persist
 // convention — nothing is written to STORAGE_KEY until Generate Plan runs.
-function applyOnboardingBudgetCaloriesToSettings() {
+function syncOnboardingIntoSettings() {
   $("#calories").value = $("#obCalories").value;
   $("#caloriesSlider").value = $("#obCalories").value;
 
@@ -334,13 +346,20 @@ function applyOnboardingBudgetCaloriesToSettings() {
   $("#budgetAmount").value = $("#obBudgetAmount").value;
   applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", period);
 
+  // "No" is authoritative — always zero out all three, even if the
+  // (hidden) selects still hold values from a previous "Yes" answer.
+  const prepYes = document.querySelector("#obMealPrepYesNo .bubble.selected")?.dataset.value === "yes";
+  $("#prepBreakfast").value = prepYes ? $("#obPrepBreakfast").value : 0;
+  $("#prepLunch").value = prepYes ? $("#obPrepLunch").value : 0;
+  $("#prepDinner").value = prepYes ? $("#obPrepDinner").value : 0;
+
   checkBudgetFeasibility();
 }
 
 function finishOnboarding() {
   localStorage.setItem(PREFS_KEY, JSON.stringify(collectPreferences()));
   localStorage.setItem(ONBOARDED_KEY, "1");
-  applyOnboardingBudgetCaloriesToSettings();
+  syncOnboardingIntoSettings();
   hideOnboarding();
 }
 
@@ -480,6 +499,12 @@ function initOnboarding() {
     if (btn) applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", btn.dataset.value);
   });
 
+  wireBubbleGroup($("#obMealPrepYesNo"), "single");
+  $("#obMealPrepYesNo").addEventListener("click", (e) => {
+    const btn = e.target.closest(".bubble");
+    if (btn) $("#obMealPrepDetails").classList.toggle("hidden", btn.dataset.value !== "yes");
+  });
+
   syncSlider("#obCalories", "#obCaloriesSlider");
   syncSlider("#obBudgetAmount", "#obBudgetAmountSlider");
 
@@ -528,7 +553,11 @@ function readSettings() {
     budgetAmount: Number($("#budgetAmount").value),
     snacksPerDay: Number($("#snacks").value),
     vegetarianOnly: $("#vegetarian").checked,
-    mealPrepMode: $("#mealPrepMode").checked,
+    mealPrep: {
+      breakfast: Number($("#prepBreakfast").value),
+      lunch: Number($("#prepLunch").value),
+      dinner: Number($("#prepDinner").value),
+    },
   };
 }
 
@@ -542,7 +571,10 @@ function writeSettingsToForm(s) {
   $("#budgetAmount").value = s.budgetAmount;
   $("#snacks").value = s.snacksPerDay;
   $("#vegetarian").checked = s.vegetarianOnly;
-  $("#mealPrepMode").checked = !!s.mealPrepMode;
+  const prep = s.mealPrep || { breakfast: 0, lunch: 0, dinner: 0 };
+  $("#prepBreakfast").value = prep.breakfast;
+  $("#prepLunch").value = prep.lunch;
+  $("#prepDinner").value = prep.dinner;
 }
 
 function macroTargetGrams(dailyCalories, split) {
@@ -1019,10 +1051,11 @@ function renderPlan(result) {
       ${totalSuggestion}
     </div>`;
 
-  $("#printPrepGuideBtn").classList.toggle("hidden", !summary.mealPrepMode);
-  $("#prepBatchesSection").classList.toggle("hidden", !summary.mealPrepMode);
-  if (summary.mealPrepMode) {
-    $("#prepBatches").innerHTML = renderPrepBatches(groupIntoPrepBatches(plan));
+  const prepBatches = groupIntoPrepBatches(plan);
+  $("#printPrepGuideBtn").classList.toggle("hidden", prepBatches.length === 0);
+  $("#prepBatchesSection").classList.toggle("hidden", prepBatches.length === 0);
+  if (prepBatches.length > 0) {
+    $("#prepBatches").innerHTML = renderPrepBatches(prepBatches);
   }
 
   $("#weekOverview").innerHTML = renderWeekOverview(plan);

@@ -52,7 +52,8 @@ that runs in any modern browser.
   *and disliked* proteins (tap a protein once to like it, again to say "not
   for me," a third time to clear it) → up to 3 meal styles per meal (or "no
   preference") → your calorie target → your grocery budget → your all-time
-  go-to meal. Likes and dislikes both bias meal selection (dislikes
+  go-to meal → how many times a week you meal prep each meal, if at all.
+  Likes and dislikes both bias meal selection (dislikes
   strongly, but never to a hard ban) without turning into a filter —
   variety is still preserved. Revisit anytime via the "🎯 Preferences"
   button in the header.
@@ -102,13 +103,15 @@ that runs in any modern browser.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
-- **Meal prep mode** — a checkbox in Advanced settings switches the
-  planner from "a new recipe most days" to repeating just 2 recipes per
-  meal in bigger batches across the whole week, for cooking once and
-  eating the leftovers. Adds a "🧺 This Week's Batches" summary (and a
-  matching print guide) that groups the plan by recipe instead of by day —
-  total batch quantity, servings made, and a storage/reheating note —
-  instead of the day-by-day view.
+- **Meal prep** — step 6 of onboarding asks "Do you like to meal prep?";
+  say yes and you pick, per meal, how many times a week to batch-cook it
+  (e.g. "Lunch — 4× this week") instead of a one-size-fits-all toggle —
+  the other meals that week still stay fully varied. The same three
+  controls also live in Settings' Advanced section for editing later
+  without re-running the wizard. A "🧺 This Week's Batches" summary (and a
+  matching print guide) shows only the recipes you actually chose to
+  batch — total quantity, servings made, and a storage/reheating note —
+  never a coincidental repeat from ordinary variety-picking.
 - **Edit Prices** — a "💲 Edit Prices" button in the header opens every
   food's price in one place, grouped by grocery-store section, each shown
   next to its shipped national-average default. Change what you actually
@@ -196,13 +199,16 @@ make it accurate for you:
 4. Aggregates every ingredient across the whole plan into a shopping list
    with a total cost estimate.
 
-With Meal prep mode on, step 2 runs just once per slot up front (via
-`selectPrepPool()`) to fix 2 recipes for the whole week — using the exact
-same weighting — instead of running fresh every day; each day still
-scales its copy to that day's own calorie target like step 3 always does.
-`groupIntoPrepBatches()` then re-groups the finished plan by recipe for
-the batch view, so nothing about totals, the shopping list, or history
-needs to know the difference.
+For each of breakfast/lunch/dinner you've set a meal-prep count on (e.g.
+lunch = 4), step 2 runs just once up front (via `selectPrepPool()`, same
+weighting as always) to fix one recipe, which then fills that many
+occurrences of the slot before the remaining days fall back to normal
+fresh picking — each occurrence still scales to its own day's calorie
+target like step 3 always does. Every meal placed this way is flagged
+`prepped: true`; `groupIntoPrepBatches()` groups only those for the batch
+view, so a recipe that happens to repeat later from ordinary variety
+never gets mistaken for something you asked to batch-cook. Nothing about
+totals, the shopping list, or history needs to know the difference.
 
 `estimateMinDailyCost()` in the same file computes a realistic best-case
 daily cost (cheapest eligible template per slot, same scaling bounds) — this

@@ -150,6 +150,55 @@
         </div>
       </div>
 
+      <div class="wizard-step" data-step="6">
+        <h3>Do you like to meal prep?</h3>
+        <p class="wizard-hint">Batch-cook one recipe and eat it a few times instead of something new each day.</p>
+        <div class="bubble-group" id="obMealPrepYesNo">
+          <button type="button" class="bubble selected" data-value="no">No, keep it varied</button>
+          <button type="button" class="bubble" data-value="yes">Yes, I meal prep</button>
+        </div>
+
+        <div id="obMealPrepDetails" class="hidden">
+          <p class="wizard-hint">How many times a week for each meal? Leave at "No meal prep" to skip it.</p>
+          <div class="wizard-slot">
+            <div class="wizard-slot-label">Breakfast</div>
+            <select id="obPrepBreakfast">
+              <option value="0">No meal prep</option>
+              <option value="2">2× this week</option>
+              <option value="3">3× this week</option>
+              <option value="4">4× this week</option>
+              <option value="5">5× this week</option>
+              <option value="6">6× this week</option>
+              <option value="7">7× this week (every day)</option>
+            </select>
+          </div>
+          <div class="wizard-slot">
+            <div class="wizard-slot-label">Lunch</div>
+            <select id="obPrepLunch">
+              <option value="0">No meal prep</option>
+              <option value="2">2× this week</option>
+              <option value="3">3× this week</option>
+              <option value="4">4× this week</option>
+              <option value="5">5× this week</option>
+              <option value="6">6× this week</option>
+              <option value="7">7× this week (every day)</option>
+            </select>
+          </div>
+          <div class="wizard-slot">
+            <div class="wizard-slot-label">Dinner</div>
+            <select id="obPrepDinner">
+              <option value="0">No meal prep</option>
+              <option value="2">2× this week</option>
+              <option value="3">3× this week</option>
+              <option value="4">4× this week</option>
+              <option value="5">5× this week</option>
+              <option value="6">6× this week</option>
+              <option value="7">7× this week (every day)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="wizard-nav">
         <button type="button" id="wizardSkip" class="text-link-btn">Skip for now</button>
         <div class="wizard-nav-buttons">
@@ -232,10 +281,43 @@
             <div class="form-row checkbox-row">
               <label><input type="checkbox" id="vegetarian"> Vegetarian only</label>
             </div>
-            <div class="form-row checkbox-row">
-              <label><input type="checkbox" id="mealPrepMode"> 🧺 Meal prep mode</label>
+            <p class="macro-hint" style="margin-top: 12px;">🧺 Meal prep — repeat one recipe in bigger batches for whichever meals you want, instead of a new recipe most days. Also asked during onboarding ("🎯 Preferences").</p>
+            <div class="wizard-slot">
+              <div class="wizard-slot-label">Breakfast</div>
+              <select id="prepBreakfast">
+                <option value="0">No meal prep</option>
+                <option value="2">2× this week</option>
+                <option value="3">3× this week</option>
+                <option value="4">4× this week</option>
+                <option value="5">5× this week</option>
+                <option value="6">6× this week</option>
+                <option value="7">7× this week (every day)</option>
+              </select>
             </div>
-            <p class="macro-hint">Repeats just 2 recipes per meal across the week in bigger batches, instead of a new recipe most days — good for cooking once and eating the leftovers.</p>
+            <div class="wizard-slot">
+              <div class="wizard-slot-label">Lunch</div>
+              <select id="prepLunch">
+                <option value="0">No meal prep</option>
+                <option value="2">2× this week</option>
+                <option value="3">3× this week</option>
+                <option value="4">4× this week</option>
+                <option value="5">5× this week</option>
+                <option value="6">6× this week</option>
+                <option value="7">7× this week (every day)</option>
+              </select>
+            </div>
+            <div class="wizard-slot">
+              <div class="wizard-slot-label">Dinner</div>
+              <select id="prepDinner">
+                <option value="0">No meal prep</option>
+                <option value="2">2× this week</option>
+                <option value="3">3× this week</option>
+                <option value="4">4× this week</option>
+                <option value="5">5× this week</option>
+                <option value="6">6× this week</option>
+                <option value="7">7× this week (every day)</option>
+              </select>
+            </div>
           </div>
         </details>
 

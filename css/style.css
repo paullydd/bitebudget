@@ -276,6 +276,15 @@ body {
 
 .wizard-slot { margin-top: 18px; }
 .wizard-slot-label { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; }
+.wizard-slot select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: var(--panel-alt);
+  color: var(--ink);
+}
 
 .bubble-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .bubble {

@@ -10,9 +10,10 @@ that runs in any modern browser.
 ## What it does
 
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 31 built-in recipe templates
-  (a mix of familiar staples and more adventurous options) so you don't get
-  the same meal twice in a row.
+  day for a plan of 1–14 days, rotating through 47 built-in recipe templates
+  (a mix of familiar staples and more adventurous options) covering every
+  meal style (bowl, wrap/sandwich, stir-fry, soup, salad) at both lunch and
+  dinner, so you don't get the same meal twice in a row.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient
@@ -158,14 +159,17 @@ you:
    then to the cheaper half of those when you're pacing over budget, then
    narrows to the closest-fitting quarter by comparing each template's own
    protein/carb/fat ratio to your macro split (so a 40/30/30 high-protein
-   target actually results in high-protein meals, not just a label) — then
-   picks a *weighted* random choice from what's left. Templates matching
-   your saved taste preferences (liked proteins, preferred meal style, your
-   signature meal, or a ❤️ favorite) get a higher weight within that set, and
-   templates matching a *disliked* protein get a strong penalty (rare, never
-   zero) — but everything can still appear. Skipping the preference wizard
-   (and never favoriting anything) means preference weight is equal for
-   everyone, so only the macro-fit narrowing applies.
+   target actually results in high-protein meals, not just a label) — with
+   one exception: if a template matches a taste preference you've stated
+   (style, signature, favorite) it always survives that macro-fit cut even
+   when it's a poor fit numerically, so a real preference never becomes
+   mathematically unreachable just because of your macro split. From
+   what's left, picks a *weighted* random choice — templates matching your
+   saved taste preferences get a higher weight, and templates matching a
+   *disliked* protein get a strong penalty (rare, never zero) — but
+   everything can still appear. Skipping the preference wizard (and never
+   favoriting anything) means preference weight is equal for everyone, so
+   only the macro-fit narrowing applies.
 3. Scales the chosen template's ingredient quantities toward the slot's
    calorie target (bounded to 0.7x–1.4x so portions stay realistic), and
    computes nutrition + cost.

@@ -45,6 +45,8 @@ const FOODS = {
   bacon:           { name: "Bacon",               protein: 37,   carbs: 1.4,  fat: 42,   price: 1.30, veg: false, category: "Protein", proteinFamily: "red_meat" },
   breakfast_sausage:{name: "Turkey Breakfast Sausage", protein: 14, carbs: 2, fat: 27, price: 1.10, veg: false, category: "Protein", proteinFamily: "poultry" },
   tortilla:        { name: "Flour Tortilla",      protein: 8,    carbs: 48,   fat: 7,    price: 0.30, veg: true, category: "Pantry & Grains" },
+  tuna:            { name: "Canned Tuna",         protein: 26,   carbs: 0,    fat: 1,    price: 0.60, veg: false, category: "Protein", proteinFamily: "fish" },
+  edamame:         { name: "Edamame",             protein: 11,   carbs: 10,   fat: 5,    price: 0.50, veg: true, category: "Protein", proteinFamily: "plant" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.

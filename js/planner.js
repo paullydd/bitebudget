@@ -115,7 +115,24 @@ function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, 
   if (macroSplit) {
     const withFit = candidates.map(c => ({ ...c, distance: macroDistance(c.t, macroSplit) }));
     withFit.sort((a, b) => a.distance - b.distance);
-    candidates = withFit.slice(0, Math.max(1, Math.round(withFit.length * 0.25)));
+    const kept = withFit.slice(0, Math.max(1, Math.round(withFit.length * 0.25)));
+
+    // A template matching a stated taste preference (style/signature/
+    // favorite) shouldn't become mathematically unreachable just because
+    // it's a macro-fit outlier — that would turn preferenceWeight's
+    // additive bias into a silent hard filter. Guarantee the single best
+    // preference match survives the cut too; it still has to compete on
+    // weight from there, same as everything else.
+    if (preferences) {
+      const bestPref = withFit.reduce((best, c) => {
+        const w = preferenceWeight(c.t, slot, preferences);
+        return !best || w > best.w ? { ...c, w } : best;
+      }, null);
+      if (bestPref && bestPref.w > 1 && !kept.some(c => c.t.id === bestPref.t.id)) {
+        kept.push(bestPref);
+      }
+    }
+    candidates = kept;
   }
 
   const templates = candidates.map(c => c.t);

@@ -68,6 +68,18 @@ that runs in any modern browser.
 - **Dark mode** — follows your system's light/dark setting by default; a
   toggle in the header lets you override it, and the choice is remembered.
   Printing always stays light regardless of the on-screen theme.
+- **Week at a Glance** — a compact grid (days × meal slots) above the day
+  tabs shows your whole week's shape at once; click a cell to jump straight
+  to that day instead of clicking through tabs one at a time.
+- **Nutrition Facts label** — every recipe page includes a real FDA-style
+  label (Calories, Total Fat/Carbohydrate with %DV, Protein), deliberately
+  monochrome like the label on actual packaging.
+- **Favorite a recipe** — a ❤️ on any meal (card or recipe page) boosts it
+  in future plans, on top of the existing protein-preference system — works
+  even if you skipped onboarding entirely.
+- **Print Full Plan** — a second print button turns the whole week into a
+  paginated booklet (every day, every meal, full ingredients and
+  instructions) instead of just the shopping list.
 
 ## Running it
 
@@ -122,10 +134,11 @@ you:
    then to the cheaper half of those when you're pacing over budget, then
    picks a *weighted* random choice from what's left — templates matching
    your saved taste preferences (liked proteins, preferred meal style, your
-   signature meal) get a higher weight, and templates matching a *disliked*
-   protein get a strong penalty (rare, never zero) — but everything can
-   still appear. Skipping the preference wizard means every weight is equal,
-   which is mathematically identical to a plain uniform pick.
+   signature meal, or a ❤️ favorite) get a higher weight, and templates
+   matching a *disliked* protein get a strong penalty (rare, never zero) —
+   but everything can still appear. Skipping the preference wizard (and
+   never favoriting anything) means every weight is equal, which is
+   mathematically identical to a plain uniform pick.
 3. Scales the chosen template's ingredient quantities toward the slot's
    calorie target (bounded to 0.7x–1.4x so portions stay realistic), and
    computes nutrition + cost.

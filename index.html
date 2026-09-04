@@ -239,10 +239,16 @@
     <section id="results" class="panel hidden">
       <div class="results-head">
         <h2>Your Plan</h2>
-        <button id="regenerateBtn" class="secondary-btn">🔀 Shuffle for more variety</button>
+        <div class="results-head-buttons">
+          <button type="button" id="printBookletBtn" class="secondary-btn">🖨️ Print Full Plan</button>
+          <button id="regenerateBtn" class="secondary-btn">🔀 Shuffle for more variety</button>
+        </div>
       </div>
 
       <div id="planMeta" class="meta-grid"></div>
+
+      <h3 id="weekOverviewHeading">📅 Week at a Glance</h3>
+      <div id="weekOverview" class="week-overview-wrap"></div>
 
       <div id="dayTabs" class="day-tabs"></div>
       <div id="dayViews"></div>
@@ -262,9 +268,11 @@
         <div class="recipe-slot" id="recipeSlot"></div>
         <h2 class="recipe-title" id="recipeTitle"></h2>
         <div class="recipe-macros" id="recipeMacros"></div>
+        <button type="button" id="recipeFavoriteBtn" class="recipe-favorite-btn">🤍 Favorite this recipe</button>
       </div>
       <div class="recipe-body">
         <div class="recipe-ingredients">
+          <div id="nutritionLabel"></div>
           <h3>Ingredients</h3>
           <ul id="recipeIngredients"></ul>
         </div>
@@ -275,6 +283,8 @@
       </div>
     </div>
   </dialog>
+
+  <div id="printBooklet" class="print-booklet"></div>
 
   <footer>
     <p>BiteBudget uses national-average grocery prices, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>

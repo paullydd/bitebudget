@@ -46,10 +46,14 @@ function preferenceWeight(template, slot, preferences) {
       weight += 4;
     }
   }
+  if (preferences.favoriteIds && preferences.favoriteIds.includes(template.id)) {
+    weight += 3;
+  }
   if (preferences.dislikedProteins && preferences.dislikedProteins.some(p => families.includes(p))) {
-    // Strong bias, not a hard ban: outweighs the bonuses above (max +8) so a
-    // disliked template drops to rare, but a floor keeps it possible so a
-    // slot's pool never effectively empties out from dislikes alone.
+    // Strong bias, not a hard ban: a meaningful penalty relative to the
+    // bonuses above so a disliked template drops toward rare, but a floor
+    // keeps it possible so a slot's pool never effectively empties out
+    // from dislikes alone.
     weight = Math.max(0.15, weight - 4);
   }
   return weight;

@@ -6,6 +6,7 @@ const PREFS_KEY = "biteBudget.preferences.v1";
 const ONBOARDED_KEY = "biteBudget.onboarded.v1";
 const SHOPPING_CHECKED_KEY = "biteBudget.shoppingChecked.v1";
 const THEME_KEY = "biteBudget.theme.v1";
+const FAVORITES_KEY = "biteBudget.favorites.v1";
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const WIZARD_TOTAL_STEPS = 5;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
@@ -303,9 +304,43 @@ function finishOnboarding() {
   hideOnboarding();
 }
 
+function loadFavorites() {
+  const saved = localStorage.getItem(FAVORITES_KEY);
+  return saved ? new Set(JSON.parse(saved)) : new Set();
+}
+
+function saveFavorites(favorites) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites]));
+}
+
+function isFavorite(templateId) {
+  return loadFavorites().has(templateId);
+}
+
+// Toggles one template's favorite state and updates every visible button
+// for it at once (the same recipe can appear more than once in a week).
+function toggleFavorite(templateId) {
+  const favorites = loadFavorites();
+  if (favorites.has(templateId)) favorites.delete(templateId); else favorites.add(templateId);
+  saveFavorites(favorites);
+
+  const nowFavorite = favorites.has(templateId);
+  document.querySelectorAll(`.favorite-btn[data-template-id="${templateId}"]`).forEach(btn => {
+    btn.textContent = nowFavorite ? "❤️" : "🤍";
+    btn.classList.toggle("active", nowFavorite);
+  });
+  return nowFavorite;
+}
+
+// Preferences saved during onboarding, plus favorites layered on top —
+// favorites work even if onboarding was skipped entirely. Stays undefined
+// (matching generatePlan's no-preferences behavior) when neither exists.
 function loadPreferences() {
   const saved = localStorage.getItem(PREFS_KEY);
-  return saved ? JSON.parse(saved) : undefined;
+  const prefs = saved ? JSON.parse(saved) : null;
+  const favoriteIds = [...loadFavorites()];
+  if (!prefs && favoriteIds.length === 0) return undefined;
+  return { ...(prefs || {}), favoriteIds };
 }
 
 function initOnboarding() {
@@ -417,6 +452,7 @@ function slotIcon(slot) {
 
 function renderMealCard(meal, dayIndex, mealIndex) {
   const n = meal.nutrition;
+  const favorite = isFavorite(meal.id);
   return `
     <div class="meal-card">
       <div class="meal-head">
@@ -425,6 +461,7 @@ function renderMealCard(meal, dayIndex, mealIndex) {
           <div class="meal-slot">${meal.slot}</div>
           <div class="meal-name">${meal.name}</div>
         </div>
+        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="Favorite this meal" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
         <div class="meal-cost">${money(n.cost)}</div>
       </div>
@@ -438,12 +475,45 @@ function renderMealCard(meal, dayIndex, mealIndex) {
     </div>`;
 }
 
+// Builds an FDA-style "Nutrition Facts" box. %DV uses the standard FDA
+// 2,000-calorie reference values (fat 78g, carbohydrate 275g); protein gets
+// no %DV, matching real labels, which don't require one.
+function renderNutritionLabel(n) {
+  const fatDV = Math.round((n.fat / 78) * 100);
+  const carbDV = Math.round((n.carbs / 275) * 100);
+  return `
+    <div class="nutrition-label">
+      <div class="nutrition-title">Nutrition Facts</div>
+      <div class="nutrition-rule thick"></div>
+      <div class="nutrition-calories">
+        <span>Calories</span>
+        <span>${Math.round(n.cal)}</span>
+      </div>
+      <div class="nutrition-rule medium"></div>
+      <div class="nutrition-dv-header">% Daily Value*</div>
+      <div class="nutrition-row"><span><strong>Total Fat</strong> ${grams(n.fat)}</span><span>${fatDV}%</span></div>
+      <div class="nutrition-rule thin"></div>
+      <div class="nutrition-row"><span><strong>Total Carbohydrate</strong> ${grams(n.carbs)}</span><span>${carbDV}%</span></div>
+      <div class="nutrition-rule thin"></div>
+      <div class="nutrition-row"><span><strong>Protein</strong> ${grams(n.protein)}</span><span></span></div>
+      <div class="nutrition-rule thick"></div>
+      <div class="nutrition-footnote">*Percent Daily Values are based on a 2,000 calorie diet.</div>
+    </div>`;
+}
+
+let currentRecipeMealId = null;
+
 // Opens the shared recipe dialog styled as a cookbook page for one meal.
 function openRecipeModal(meal) {
   const n = meal.nutrition;
+  currentRecipeMealId = meal.id;
   $("#recipeSlot").textContent = meal.slot;
   $("#recipeTitle").textContent = meal.name;
   $("#recipeMacros").textContent = `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)}`;
+  const favorite = isFavorite(meal.id);
+  $("#recipeFavoriteBtn").textContent = favorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
+  $("#recipeFavoriteBtn").classList.toggle("active", favorite);
+  $("#nutritionLabel").innerHTML = renderNutritionLabel(n);
   $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("");
   $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${s}</li>`).join("");
   $("#recipeModal").showModal();
@@ -523,6 +593,71 @@ function renderShoppingList(shoppingList, totalCost, totalBudget) {
     </div>`;
 }
 
+// Builds the full printable meal-plan booklet: every day, every meal, full
+// ingredients/instructions — the same content openRecipeModal shows for one
+// meal, laid out single-column (no spine) for clean print pagination.
+function renderPrintBooklet(result) {
+  const { plan, summary } = result;
+  const header = `
+    <div class="booklet-header">
+      <h1>BiteBudget Meal Plan</h1>
+      <p>${summary.days} days · ${summary.dailyCalories} kcal/day · ${money(summary.totalCost)} / ${money(summary.totalBudget)} budget</p>
+    </div>`;
+
+  const days = plan.map(day => `
+    <div class="booklet-day">
+      <h2>Day ${day.day}</h2>
+      ${day.meals.map(m => `
+        <div class="booklet-meal">
+          <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
+          <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}</p>
+          <div class="booklet-meal-body">
+            <div>
+              <strong>Ingredients</strong>
+              <ul>${m.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("")}</ul>
+            </div>
+            <div>
+              <strong>Instructions</strong>
+              <ol>${m.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
+            </div>
+          </div>
+        </div>`).join("")}
+    </div>`).join("");
+
+  return header + days;
+}
+
+// Grid: one row per day, one column per meal slot (positional — every day
+// has the same slot sequence since generatePlan's slotsToday is
+// deterministic per settings). Clicking a cell reuses activateDay(), the
+// same single place that already owns "switch to day N" for the tabs.
+function renderWeekOverview(plan) {
+  if (!plan.length) return "";
+
+  const slotCounts = {};
+  plan[0].meals.forEach(m => { slotCounts[m.slot] = (slotCounts[m.slot] || 0) + 1; });
+  const seen = {};
+  const headers = plan[0].meals.map(m => {
+    seen[m.slot] = (seen[m.slot] || 0) + 1;
+    const label = m.slot.charAt(0).toUpperCase() + m.slot.slice(1);
+    return slotCounts[m.slot] > 1 ? `${label} ${seen[m.slot]}` : label;
+  });
+
+  const headerRow = `
+    <div class="week-overview-row week-overview-header">
+      <div class="week-overview-daylabel"></div>
+      ${headers.map(h => `<div>${h}</div>`).join("")}
+    </div>`;
+
+  const rows = plan.map(day => `
+    <div class="week-overview-row">
+      <button type="button" class="week-overview-daylabel" data-day="${day.day}">Day ${day.day}</button>
+      ${day.meals.map(m => `<button type="button" class="week-overview-cell" data-day="${day.day}" title="${m.name}">${m.name}</button>`).join("")}
+    </div>`).join("");
+
+  return `<div class="week-overview-grid" style="--week-cols: ${headers.length}">${headerRow}${rows}</div>`;
+}
+
 function renderPlan(result) {
   currentPlanResult = result;
   const { plan, shoppingList, summary } = result;
@@ -542,6 +677,8 @@ function renderPlan(result) {
       <div class="value">${money(summary.totalCost)} <span class="muted">/ ${money(summary.totalBudget)} budget</span></div>
       ${totalSuggestion}
     </div>`;
+
+  $("#weekOverview").innerHTML = renderWeekOverview(plan);
 
   const tabs = plan.map(d => `<button class="day-tab" data-day="${d.day}">Day ${d.day}</button>`).join("");
   $("#dayTabs").innerHTML = tabs;
@@ -607,6 +744,13 @@ function init() {
     if (e.target.matches(".day-tab")) activateDay(Number(e.target.dataset.day));
   });
 
+  $("#weekOverview").addEventListener("click", (e) => {
+    const cell = e.target.closest("[data-day]");
+    if (!cell) return;
+    activateDay(Number(cell.dataset.day));
+    $("#dayTabs").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
   $("#dayViews").addEventListener("click", (e) => {
     if (!currentPlanResult) return;
 
@@ -625,12 +769,24 @@ function init() {
       const dayIndex = Number(recipeBtn.dataset.dayIndex);
       const mealIndex = Number(recipeBtn.dataset.mealIndex);
       openRecipeModal(currentPlanResult.plan[dayIndex].meals[mealIndex]);
+      return;
+    }
+
+    const favoriteBtn = e.target.closest(".favorite-btn");
+    if (favoriteBtn) {
+      toggleFavorite(favoriteBtn.dataset.templateId);
     }
   });
 
   $("#recipeCloseBtn").addEventListener("click", () => $("#recipeModal").close());
   $("#recipeModal").addEventListener("click", (e) => {
     if (e.target === $("#recipeModal")) $("#recipeModal").close();
+  });
+  $("#recipeFavoriteBtn").addEventListener("click", () => {
+    if (!currentRecipeMealId) return;
+    const nowFavorite = toggleFavorite(currentRecipeMealId);
+    $("#recipeFavoriteBtn").textContent = nowFavorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
+    $("#recipeFavoriteBtn").classList.toggle("active", nowFavorite);
   });
 
   ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian"].forEach(sel => {
@@ -641,6 +797,13 @@ function init() {
 
   $("#printListBtn").addEventListener("click", () => {
     document.body.classList.add("print-shopping-list");
+    window.print();
+  });
+
+  $("#printBookletBtn").addEventListener("click", () => {
+    if (!currentPlanResult) return;
+    $("#printBooklet").innerHTML = renderPrintBooklet(currentPlanResult);
+    document.body.classList.add("print-full-plan");
     window.print();
   });
 
@@ -662,6 +825,7 @@ function init() {
   });
   window.addEventListener("afterprint", () => {
     document.body.classList.remove("print-shopping-list");
+    document.body.classList.remove("print-full-plan");
   });
 
   $("#macroProtein").addEventListener("input", () => balanceMacros("protein"));

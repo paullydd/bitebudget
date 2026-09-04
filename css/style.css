@@ -251,6 +251,7 @@ main {
 }
 .panel h2 { margin-top: 0; }
 .hidden { display: none; }
+.print-booklet { display: none; }
 
 form { display: flex; flex-direction: column; gap: 16px; }
 
@@ -303,6 +304,51 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .secondary-btn:hover { background: var(--border); }
 
 .results-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.results-head-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ---------- Week-at-a-glance grid ---------- */
+.week-overview-wrap { overflow-x: auto; margin: 4px 0 18px; border: 1px solid var(--border); border-radius: 10px; }
+.week-overview-grid {
+  display: grid;
+  grid-template-columns: 72px repeat(var(--week-cols), minmax(110px, 1fr));
+  min-width: max-content;
+}
+.week-overview-row { display: contents; }
+.week-overview-header > div {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-alt);
+}
+.week-overview-daylabel {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 8px 10px;
+  text-align: left;
+}
+.week-overview-cell {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.week-overview-cell:hover, .week-overview-daylabel:hover { background: var(--hover-bg); }
 
 .meta-grid, .day-summary {
   display: grid;
@@ -349,7 +395,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .meal-slot { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
 .meal-name { font-weight: 700; }
 .meal-cost { margin-left: auto; font-weight: 700; color: var(--accent-dark); }
-.meal-swap-btn {
+.meal-swap-btn, .favorite-btn {
   border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 8px;
@@ -358,7 +404,8 @@ form { display: flex; flex-direction: column; gap: 16px; }
   cursor: pointer;
   line-height: 1;
 }
-.meal-swap-btn:hover { background: var(--hover-bg); }
+.meal-swap-btn:hover, .favorite-btn:hover { background: var(--hover-bg); }
+.favorite-btn.active { border-color: var(--bad); }
 .meal-macros { display: flex; gap: 12px; margin: 10px 0; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
 .recipe-btn {
   border: 1px solid var(--border);
@@ -420,7 +467,41 @@ form { display: flex; flex-direction: column; gap: 16px; }
   margin-bottom: 8px;
 }
 .recipe-title { font-size: 1.7rem; margin: 0 0 10px; }
-.recipe-macros { font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.82rem; color: #6b5f45; }
+.recipe-macros { font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.82rem; color: #6b5f45; margin-bottom: 14px; }
+.recipe-favorite-btn {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  border: 1px solid #cabf9e;
+  background: #fdf8ee;
+  color: #6b5f45;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.recipe-favorite-btn:hover { background: #f3ead4; }
+.recipe-favorite-btn.active { border-color: #b3441e; color: #8a3212; }
+
+/* ---------- FDA-style nutrition label: deliberately monochrome ---------- */
+.nutrition-label {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  border: 3px solid #000;
+  padding: 10px 12px 8px;
+  margin-bottom: 20px;
+  color: #000;
+  background: #fff;
+}
+.nutrition-title { font-size: 1.3rem; font-weight: 800; }
+.nutrition-rule { background: #000; margin: 4px 0; }
+.nutrition-rule.thick { height: 6px; }
+.nutrition-rule.medium { height: 3px; }
+.nutrition-rule.thin { height: 1px; }
+.nutrition-calories { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
+.nutrition-calories span:first-child { font-size: 0.9rem; }
+.nutrition-calories span:last-child { font-size: 1.6rem; }
+.nutrition-dv-header { text-align: right; font-size: 0.72rem; font-weight: 700; padding: 2px 0; }
+.nutrition-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; }
+.nutrition-footnote { font-size: 0.68rem; margin-top: 6px; line-height: 1.4; }
 
 .recipe-body { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
 .recipe-body h3 {
@@ -500,6 +581,8 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
   body.print-shopping-list .panel:not(#results),
   body.print-shopping-list .results-head,
   body.print-shopping-list #planMeta,
+  body.print-shopping-list #weekOverviewHeading,
+  body.print-shopping-list #weekOverview,
   body.print-shopping-list #dayTabs,
   body.print-shopping-list #dayViews,
   body.print-shopping-list #printListBtn,
@@ -510,4 +593,28 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
     border: none;
     padding: 0;
   }
+
+  /* Full meal-plan booklet is a separate document from the app UI, so
+     hiding every other top-level element is simpler than the selective
+     hiding print-shopping-list needs (it stays inside #results). */
+  .print-booklet { display: none; }
+  body.print-full-plan > *:not(#printBooklet) { display: none !important; }
+  body.print-full-plan .print-booklet {
+    display: block;
+    font-family: Georgia, "Times New Roman", serif;
+    color: #1f2420;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .booklet-header { text-align: center; margin-bottom: 24px; }
+  .booklet-header h1 { margin-bottom: 6px; }
+  .booklet-header p { color: #6b7268; font-family: Arial, sans-serif; font-size: 0.9rem; }
+  .booklet-day { page-break-before: always; }
+  .booklet-day:first-child { page-break-before: avoid; }
+  .booklet-day h2 { border-bottom: 3px double #cabf9e; padding-bottom: 8px; }
+  .booklet-meal { page-break-inside: avoid; margin: 0 0 26px; }
+  .booklet-meal h3 { margin-bottom: 4px; text-transform: capitalize; }
+  .booklet-meal-macros { font-family: Arial, sans-serif; font-size: 0.82rem; color: #6b7268; margin: 0 0 10px; }
+  .booklet-meal-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; font-size: 0.92rem; }
+  .booklet-meal-body ul, .booklet-meal-body ol { margin: 4px 0 0; padding-left: 20px; }
 }

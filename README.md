@@ -59,7 +59,14 @@ that runs in any modern browser.
   still land near your calorie target. Going out and don't know what you'll
   order yet? Check "Leave this open" instead — it becomes a placeholder you
   fill in later without disturbing anything else in the plan. A logged meal
-  can always be reverted to an auto-picked one with ↩️.
+  can always be reverted to an auto-picked one with ↩️. Check "💾 Save this
+  meal" to add it to a short personal list you can pick from next time
+  instead of retyping the same macros.
+- **Export / Import your data** — footer links download everything stored
+  locally (settings, preferences, favorites, history, achievements, saved
+  meals) as one JSON file, and import it back — a manual backup/restore or
+  a way to move to another browser or device, with no account and no
+  server involved.
 - **Slide-or-type controls** — calorie target and budget amount can be set
   with a slider or typed directly, in both the onboarding wizard and the
   Settings panel; the budget slider's range adapts to whichever period

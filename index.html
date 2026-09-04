@@ -290,6 +290,7 @@
     <div class="achievements-page">
       <button type="button" id="customMealCloseBtn" class="recipe-close" aria-label="Close">✕</button>
       <h2 id="customMealTitle">Add your own meal</h2>
+      <div id="myMealsList" class="my-meals-list hidden"></div>
       <form id="customMealForm">
         <div class="form-row">
           <label for="customMealName">Meal name</label>
@@ -315,6 +316,9 @@
           <input type="number" id="customMealCost" min="0" step="0.01" value="0">
         </div>
         <div class="form-row checkbox-row">
+          <label><input type="checkbox" id="customMealSave"> 💾 Save this meal so I can reuse it later</label>
+        </div>
+        <div class="form-row checkbox-row">
           <label><input type="checkbox" id="customMealOpen"> Leave this open — I'll fill it in later</label>
         </div>
         <button type="submit" class="primary-btn">Save</button>
@@ -334,7 +338,12 @@
 
   <footer>
     <p>BiteBudget uses national-average grocery prices, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>
-    <button type="button" id="resetAppBtn" class="text-link-btn">Reset app</button>
+    <div class="footer-actions">
+      <button type="button" id="exportDataBtn" class="text-link-btn">⬇️ Export my data</button>
+      <button type="button" id="importDataBtn" class="text-link-btn">⬆️ Import data</button>
+      <input type="file" id="importDataInput" accept="application/json" class="hidden">
+      <button type="button" id="resetAppBtn" class="text-link-btn">Reset app</button>
+    </div>
   </footer>
 
   <script src="js/foods.js"></script>

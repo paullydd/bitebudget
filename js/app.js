@@ -8,6 +8,7 @@ const SHOPPING_CHECKED_KEY = "biteBudget.shoppingChecked.v1";
 const THEME_KEY = "biteBudget.theme.v1";
 const FAVORITES_KEY = "biteBudget.favorites.v1";
 const HISTORY_KEY = "biteBudget.history.v1";
+const MY_MEALS_KEY = "biteBudget.myMeals.v1";
 const RECIPES_TRIED_KEY = "biteBudget.recipesTried.v1";
 const BADGES = [
   { id: "first_plan", icon: "🌱", name: "First Plan", desc: "Generate your first meal plan.", check: s => s.plansGenerated >= 1 },
@@ -641,6 +642,48 @@ function renderNutritionLabel(n) {
     </div>`;
 }
 
+function loadMyMeals() {
+  const saved = localStorage.getItem(MY_MEALS_KEY);
+  return saved ? JSON.parse(saved) : [];
+}
+
+function saveMyMeals(meals) {
+  localStorage.setItem(MY_MEALS_KEY, JSON.stringify(meals));
+}
+
+// Upsert by name (case-insensitive) so re-saving the same meal just updates
+// its numbers instead of piling up duplicates.
+function upsertMyMeal(meal) {
+  const meals = loadMyMeals();
+  const idx = meals.findIndex(m => m.name.toLowerCase() === meal.name.toLowerCase());
+  if (idx >= 0) meals[idx] = meal; else meals.push(meal);
+  saveMyMeals(meals);
+}
+
+function removeMyMeal(name) {
+  saveMyMeals(loadMyMeals().filter(m => m.name.toLowerCase() !== name.toLowerCase()));
+}
+
+// The "pick from a meal you've saved before" list at the top of the custom-
+// meal dialog — hidden entirely once there's nothing saved yet.
+function renderMyMealsList() {
+  const meals = loadMyMeals();
+  const container = $("#myMealsList");
+  if (!meals.length) {
+    container.classList.add("hidden");
+    container.innerHTML = "";
+    return;
+  }
+  container.classList.remove("hidden");
+  container.innerHTML = `
+    <div class="my-meals-label">Your saved meals</div>
+    ${meals.map(m => `
+      <div class="my-meal-row">
+        <button type="button" class="my-meal-pick" data-name="${m.name}">${m.name} — ${Math.round(m.protein * 4 + m.carbs * 4 + m.fat * 9)} kcal</button>
+        <button type="button" class="my-meal-remove" data-name="${m.name}" aria-label="Remove saved meal" title="Remove saved meal">✕</button>
+      </div>`).join("")}`;
+}
+
 let customMealTarget = null; // { dayIndex, mealIndex, wasCustom }
 
 function updateCustomMealCalories() {
@@ -666,7 +709,9 @@ function openCustomMealDialog(dayIndex, mealIndex) {
   $("#customMealFat").value = known ? Math.round(meal.nutrition.fat) : 0;
   $("#customMealCost").value = known ? meal.nutrition.cost.toFixed(2) : 0;
   $("#customMealOpen").checked = false;
+  $("#customMealSave").checked = false;
   updateCustomMealCalories();
+  renderMyMealsList();
   $("#customMealDialog").showModal();
 }
 
@@ -1023,6 +1068,27 @@ function init() {
   $("#customMealDialog").addEventListener("click", (e) => {
     if (e.target === $("#customMealDialog")) $("#customMealDialog").close();
   });
+  $("#myMealsList").addEventListener("click", (e) => {
+    const pick = e.target.closest(".my-meal-pick");
+    if (pick) {
+      const meal = loadMyMeals().find(m => m.name === pick.dataset.name);
+      if (meal) {
+        $("#customMealName").value = meal.name;
+        $("#customMealProtein").value = meal.protein;
+        $("#customMealCarbs").value = meal.carbs;
+        $("#customMealFat").value = meal.fat;
+        $("#customMealCost").value = meal.cost.toFixed(2);
+        $("#customMealOpen").checked = false;
+        updateCustomMealCalories();
+      }
+      return;
+    }
+    const remove = e.target.closest(".my-meal-remove");
+    if (remove) {
+      removeMyMeal(remove.dataset.name);
+      renderMyMealsList();
+    }
+  });
   ["#customMealProtein", "#customMealCarbs", "#customMealFat"].forEach(sel => {
     $(sel).addEventListener("input", updateCustomMealCalories);
   });
@@ -1050,6 +1116,9 @@ function init() {
         slot, id: `custom-${Date.now()}`, name: name || "Custom meal", items: [], instructions: [],
         custom: true, pending: false, nutrition: { cal, protein, carbs, fat, cost },
       };
+      if ($("#customMealSave").checked && name) {
+        upsertMyMeal({ name, protein, carbs, fat, cost });
+      }
     }
 
     const rebalance = !wasCustom && !leaveOpen;
@@ -1095,6 +1164,39 @@ function init() {
     if (e.target.checked) checked.add(food); else checked.delete(food);
     saveCheckedShoppingItems(checked);
     e.target.closest(".shopping-item").classList.toggle("checked", e.target.checked);
+  });
+
+  $("#exportDataBtn").addEventListener("click", () => {
+    const payload = { exportedAt: new Date().toISOString(), version: 1, data: {} };
+    Object.keys(localStorage)
+      .filter(k => k.startsWith("biteBudget."))
+      .forEach(k => { payload.data[k] = localStorage.getItem(k); });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bitebudget-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  $("#importDataBtn").addEventListener("click", () => $("#importDataInput").click());
+  $("#importDataInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || typeof parsed.data !== "object") throw new Error("Not a BiteBudget backup file.");
+      if (!confirm("Import this backup? This replaces your current settings, preferences, favorites, and history.")) return;
+      Object.entries(parsed.data).forEach(([k, v]) => {
+        if (k.startsWith("biteBudget.")) localStorage.setItem(k, v);
+      });
+      location.reload();
+    } catch (err) {
+      alert("Couldn't read that file — make sure it's a BiteBudget export.");
+    } finally {
+      e.target.value = "";
+    }
   });
 
   $("#resetAppBtn").addEventListener("click", () => {

@@ -117,6 +117,38 @@ body {
 .custom-meal-dialog { max-width: 440px; }
 .custom-meal-dialog #customMealForm { display: flex; flex-direction: column; gap: 14px; }
 .custom-meal-dialog .primary-btn { width: 100%; }
+.my-meals-list {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--panel-alt);
+}
+.my-meals-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin-bottom: 6px; }
+.my-meal-row { display: flex; align-items: center; gap: 6px; }
+.my-meal-row + .my-meal-row { margin-top: 4px; }
+.my-meal-pick {
+  flex: 1;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+.my-meal-pick:hover { background: var(--hover-bg); }
+.my-meal-remove {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.my-meal-remove:hover { background: var(--hover-bg); color: var(--bad); }
 .badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
 .badge-card {
   border: 1px solid var(--border);
@@ -629,6 +661,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
 footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding-bottom: 30px; }
 footer code { background: var(--panel-alt); color: var(--ink); padding: 2px 6px; border-radius: 4px; }
 footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85rem; }
+.footer-actions { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
 
 @media print {
   /* Printed output is always light, regardless of on-screen dark mode. */

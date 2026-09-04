@@ -1,4 +1,4 @@
-const CACHE_NAME = "bitebudget-v1";
+const CACHE_NAME = "bitebudget-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -28,19 +28,20 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first: always serve the latest deployed files when online (this
+// app updates often), falling back to the cached copy only when the
+// network request fails — that's what actually provides offline support.
+// A pure cache-first strategy here would serve whatever was cached on a
+// visitor's first visit forever, since nothing would ever re-fetch it.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request)
-          .then((response) => {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-            return response;
-          })
-          .catch(() => cached)
-    )
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

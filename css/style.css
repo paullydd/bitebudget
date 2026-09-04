@@ -300,6 +300,7 @@ body {
 .bubble:hover { background: var(--hover-bg); }
 .bubble.selected { background: var(--accent); color: white; border-color: var(--accent); }
 .bubble.disliked { background: var(--bad); color: white; border-color: var(--bad); }
+.bubble.excluded { background: var(--bad); color: white; border-color: var(--bad); text-decoration: line-through; }
 
 .wizard-nav {
   display: flex;

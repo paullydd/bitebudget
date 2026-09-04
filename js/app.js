@@ -184,6 +184,31 @@ function wireBubbleGroup(container, mode, options = {}) {
       } else {
         btn.classList.add("selected");
       }
+    } else if (mode === "style-tristate") {
+      // Like multi-limited (capped preferred picks, "no preference"
+      // exclusive) but with a third state: tap a preferred style again to
+      // rule it out entirely (hard-excluded, no cap on how many).
+      if (btn.dataset.value === "no_preference") {
+        [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
+        container.querySelectorAll(".bubble").forEach(b => b.classList.remove("excluded"));
+        return;
+      }
+      const noPref = container.querySelector('.bubble[data-value="no_preference"]');
+      if (btn.classList.contains("selected")) {
+        btn.classList.remove("selected");
+        btn.classList.add("excluded");
+      } else if (btn.classList.contains("excluded")) {
+        btn.classList.remove("excluded");
+      } else if (container.querySelectorAll(".bubble.selected").length < max) {
+        if (noPref) noPref.classList.remove("selected");
+        btn.classList.add("selected");
+      } else {
+        // Preferred cap already reached — this bubble can't become
+        // preferred, but excluding has no cap, so a tap still does
+        // something useful instead of being silently ignored.
+        if (noPref) noPref.classList.remove("selected");
+        btn.classList.add("excluded");
+      }
     } else {
       [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
     }
@@ -240,7 +265,7 @@ function hideOnboarding() {
 }
 
 function clearBubbleSelections() {
-  document.querySelectorAll(".bubble.selected, .bubble.disliked").forEach(b => b.classList.remove("selected", "disliked"));
+  document.querySelectorAll(".bubble.selected, .bubble.disliked, .bubble.excluded").forEach(b => b.classList.remove("selected", "disliked", "excluded"));
 }
 
 function prefillOnboarding(prefs) {
@@ -262,6 +287,14 @@ function prefillOnboarding(prefs) {
       [].concat(vals).forEach(val => {
         const b = document.querySelector(`#${groupId} .bubble[data-value="${val}"]`);
         if (b) b.classList.add("selected");
+      });
+    });
+    Object.entries(prefs.excludedMealStyle || {}).forEach(([slot, vals]) => {
+      const groupId = STYLE_GROUP_IDS[slot];
+      if (!groupId) return;
+      [].concat(vals).forEach(val => {
+        const b = document.querySelector(`#${groupId} .bubble[data-value="${val}"]`);
+        if (b) b.classList.add("excluded");
       });
     });
     if (prefs.signature) {
@@ -306,11 +339,14 @@ function collectPreferences() {
   const dislikedProteins = [...document.querySelectorAll("#proteinBubbles .bubble.disliked")].map(b => b.dataset.value);
 
   const mealStyle = {};
+  const excludedMealStyle = {};
   Object.entries(STYLE_GROUP_IDS).forEach(([slot, groupId]) => {
     const sel = [...document.querySelectorAll(`#${groupId} .bubble.selected`)]
       .map(b => b.dataset.value)
       .filter(v => v !== "no_preference");
     if (sel.length) mealStyle[slot] = sel;
+    const excluded = [...document.querySelectorAll(`#${groupId} .bubble.excluded`)].map(b => b.dataset.value);
+    if (excluded.length) excludedMealStyle[slot] = excluded;
   });
 
   const sigSlotBtn = document.querySelector("#signatureSlot .bubble.selected");
@@ -329,6 +365,7 @@ function collectPreferences() {
     proteins: proteins.length ? proteins : undefined,
     dislikedProteins: dislikedProteins.length ? dislikedProteins : undefined,
     mealStyle: Object.keys(mealStyle).length ? mealStyle : undefined,
+    excludedMealStyle: Object.keys(excludedMealStyle).length ? excludedMealStyle : undefined,
     signature,
   };
 }
@@ -489,7 +526,7 @@ function computeStats() {
 
 function initOnboarding() {
   wireBubbleGroup($("#proteinBubbles"), "tristate");
-  Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), "multi-limited", { max: 3 }));
+  Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), "style-tristate", { max: 3 }));
   wireBubbleGroup($("#signatureSlot"), "single");
   wireBubbleGroup($("#signaturePreset"), "single");
 

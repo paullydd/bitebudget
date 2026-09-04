@@ -101,6 +101,17 @@ function weightedPick(candidates, weights) {
 function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, macroSplit) {
   let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
   if (vegetarianOnly) pool = pool.filter(t => isVegetarian(t.items));
+
+  // A style the user has crossed off is a genuine hard filter (unlike the
+  // rest of the preference system, which only ever biases weight) — but
+  // never let it empty a slot out entirely; skip it rather than break
+  // planning if every style for this slot somehow got excluded.
+  if (preferences && preferences.excludedMealStyle && preferences.excludedMealStyle[slot]) {
+    const excluded = preferences.excludedMealStyle[slot];
+    const filtered = pool.filter(t => !excluded.includes(t.style));
+    if (filtered.length > 0) pool = filtered;
+  }
+
   let fresh = pool.filter(t => !recentIds.includes(t.id));
   if (fresh.length === 0) fresh = pool; // all recently used, allow repeats
 

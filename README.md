@@ -10,10 +10,11 @@ that runs in any modern browser.
 ## What it does
 
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 47 built-in recipe templates
-  (a mix of familiar staples and more adventurous options) covering every
-  meal style (bowl, wrap/sandwich, stir-fry, soup, salad) at both lunch and
-  dinner, so you don't get the same meal twice in a row.
+  day for a plan of 1–14 days, rotating through 59 built-in recipe templates
+  (a mix of familiar staples and more adventurous options), with at least 3
+  templates for every meal style (bowl, wrap/sandwich, stir-fry, soup,
+  salad) at both lunch and dinner, so you don't get the same meal twice in
+  a row.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient
@@ -55,8 +56,11 @@ that runs in any modern browser.
   go-to meal → how many times a week you meal prep each meal, if at all.
   Likes and dislikes both bias meal selection (dislikes
   strongly, but never to a hard ban) without turning into a filter —
-  variety is still preserved. Revisit anytime via the "🎯 Preferences"
-  button in the header.
+  variety is still preserved. Meal styles are the one exception: tap a
+  style a second time to cross it off (red, struck through) and it's
+  genuinely excluded — e.g. rule out soup for dinner and you'll never get
+  a soup dinner, full stop. Revisit anytime via the "🎯 Preferences" button
+  in the header.
 - **Log your own meal** — a 📝 button on any meal card lets you swap it for
   something you're actually eating: type a name and protein/carbs/fat (cost
   optional), and the rest of that day's meals automatically recalculate to
@@ -178,9 +182,12 @@ make it accurate for you:
 
 1. Splits your daily calorie target across meal slots (breakfast 25%, lunch
    30%, dinner 35%, snacks 10% split across however many you chose).
-2. For each slot, filters to templates you haven't had in the last 3 days,
-   then to the cheaper half of those when you're pacing over budget, then
-   narrows to the closest-fitting quarter by comparing each template's own
+2. For each slot, first drops any template whose style you've crossed off
+   entirely (a real filter, not a bias — the only preference that works
+   this way; skipped instead of ever leaving a slot with zero options).
+   Filters to templates you haven't had in the last 3 days, then to the
+   cheaper half of those when you're pacing over budget, then narrows to
+   the closest-fitting quarter by comparing each template's own
    protein/carb/fat ratio to your macro split (so a 40/30/30 high-protein
    target actually results in high-protein meals, not just a label) — with
    one exception: if a template matches a taste preference you've stated

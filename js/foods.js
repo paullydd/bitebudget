@@ -47,6 +47,8 @@ const FOODS = {
   tortilla:        { name: "Flour Tortilla",      protein: 8,    carbs: 48,   fat: 7,    price: 0.30, veg: true, category: "Pantry & Grains" },
   tuna:            { name: "Canned Tuna",         protein: 26,   carbs: 0,    fat: 1,    price: 0.60, veg: false, category: "Protein", proteinFamily: "fish" },
   edamame:         { name: "Edamame",             protein: 11,   carbs: 10,   fat: 5,    price: 0.50, veg: true, category: "Protein", proteinFamily: "plant" },
+  protein_powder:  { name: "Protein Powder",      protein: 80,   carbs: 8,    fat: 5,    price: 3.50, veg: true, category: "Pantry & Grains", proteinFamily: "dairy" },
+  protein_bar:     { name: "Protein Bar",         protein: 33,   carbs: 24,   fat: 13,   price: 3.50, veg: true, category: "Pantry & Grains" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.

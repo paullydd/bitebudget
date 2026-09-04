@@ -10,11 +10,12 @@ that runs in any modern browser.
 ## What it does
 
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 59 built-in recipe templates
+  day for a plan of 1–14 days, rotating through 65 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3
   templates for every meal style (bowl, wrap/sandwich, stir-fry, soup,
-  salad) at both lunch and dinner, so you don't get the same meal twice in
-  a row.
+  salad) at both lunch and dinner, plus high-protein snacks (protein shake,
+  protein bar, peanut butter protein balls) for hitting a protein target
+  without another full meal, so you don't get the same meal twice in a row.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient
@@ -38,6 +39,11 @@ that runs in any modern browser.
   variety without changing your settings.
 - **Adjustable text size** — A−/A+ controls in the header scale the whole
   UI (90%–140%), remembered across visits, for readability across ages.
+- **Accessible to screen readers and keyboard users** — one heading per
+  page, every form control has a real associated label, every toggle
+  bubble and favorite/day-tab button exposes its current state via
+  `aria-pressed`/`aria-current` (not just a color change), and the budget
+  warning announces itself the moment it appears.
 - **Printable shopping list** — a dedicated print button formats just the
   shopping list for a physical copy to take to the store.
 - **Installable (PWA)** — has a manifest and service worker so it can be

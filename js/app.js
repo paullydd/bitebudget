@@ -154,6 +154,27 @@ function applyBudgetSliderRange(rangeSel, numberSel, period) {
 
 let wizardStep = 1;
 
+// Keeps a bubble's aria-pressed/aria-label in sync with its visual state
+// (selected/disliked/excluded via CSS class, currently the only signal a
+// sighted user gets) — called after every state change, both from real
+// clicks and from prefillOnboarding()'s programmatic restores.
+function updateBubbleAria(btn) {
+  const base = btn.dataset.baseLabel ?? (btn.dataset.baseLabel = btn.textContent.trim());
+  if (btn.classList.contains("selected")) {
+    btn.setAttribute("aria-pressed", "true");
+    btn.setAttribute("aria-label", `${base} — selected`);
+  } else if (btn.classList.contains("excluded")) {
+    btn.setAttribute("aria-pressed", "true");
+    btn.setAttribute("aria-label", `${base} — excluded`);
+  } else if (btn.classList.contains("disliked")) {
+    btn.setAttribute("aria-pressed", "true");
+    btn.setAttribute("aria-label", `${base} — disliked`);
+  } else {
+    btn.setAttribute("aria-pressed", "false");
+    btn.removeAttribute("aria-label");
+  }
+}
+
 function wireBubbleGroup(container, mode, options = {}) {
   const max = options.max || Infinity;
   container.addEventListener("click", (e) => {
@@ -166,14 +187,14 @@ function wireBubbleGroup(container, mode, options = {}) {
       // otherwise toggle, capped at `max` simultaneous picks.
       if (btn.dataset.value === "no_preference") {
         [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
-        return;
-      }
-      const noPref = container.querySelector('.bubble[data-value="no_preference"]');
-      if (noPref) noPref.classList.remove("selected");
-      if (btn.classList.contains("selected")) {
-        btn.classList.remove("selected");
-      } else if (container.querySelectorAll(".bubble.selected").length < max) {
-        btn.classList.add("selected");
+      } else {
+        const noPref = container.querySelector('.bubble[data-value="no_preference"]');
+        if (noPref) noPref.classList.remove("selected");
+        if (btn.classList.contains("selected")) {
+          btn.classList.remove("selected");
+        } else if (container.querySelectorAll(".bubble.selected").length < max) {
+          btn.classList.add("selected");
+        }
       }
     } else if (mode === "tristate") {
       if (btn.classList.contains("selected")) {
@@ -191,27 +212,28 @@ function wireBubbleGroup(container, mode, options = {}) {
       if (btn.dataset.value === "no_preference") {
         [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
         container.querySelectorAll(".bubble").forEach(b => b.classList.remove("excluded"));
-        return;
-      }
-      const noPref = container.querySelector('.bubble[data-value="no_preference"]');
-      if (btn.classList.contains("selected")) {
-        btn.classList.remove("selected");
-        btn.classList.add("excluded");
-      } else if (btn.classList.contains("excluded")) {
-        btn.classList.remove("excluded");
-      } else if (container.querySelectorAll(".bubble.selected").length < max) {
-        if (noPref) noPref.classList.remove("selected");
-        btn.classList.add("selected");
       } else {
-        // Preferred cap already reached — this bubble can't become
-        // preferred, but excluding has no cap, so a tap still does
-        // something useful instead of being silently ignored.
-        if (noPref) noPref.classList.remove("selected");
-        btn.classList.add("excluded");
+        const noPref = container.querySelector('.bubble[data-value="no_preference"]');
+        if (btn.classList.contains("selected")) {
+          btn.classList.remove("selected");
+          btn.classList.add("excluded");
+        } else if (btn.classList.contains("excluded")) {
+          btn.classList.remove("excluded");
+        } else if (container.querySelectorAll(".bubble.selected").length < max) {
+          if (noPref) noPref.classList.remove("selected");
+          btn.classList.add("selected");
+        } else {
+          // Preferred cap already reached — this bubble can't become
+          // preferred, but excluding has no cap, so a tap still does
+          // something useful instead of being silently ignored.
+          if (noPref) noPref.classList.remove("selected");
+          btn.classList.add("excluded");
+        }
       }
     } else {
       [...container.querySelectorAll(".bubble")].forEach(b => b.classList.toggle("selected", b === btn));
     }
+    container.querySelectorAll(".bubble").forEach(updateBubbleAria);
   });
 }
 
@@ -332,6 +354,11 @@ function prefillOnboarding(prefs) {
   const anyPrep = [prepBreakfast, prepLunch, prepDinner].some(v => Number(v) > 0);
   document.querySelector(`#obMealPrepYesNo .bubble[data-value="${anyPrep ? "yes" : "no"}"]`)
     ?.dispatchEvent(new Event("click", { bubbles: true }));
+
+  // Most of the state above was just set via classList.add directly
+  // (bypassing the click handler that normally keeps aria in sync) — one
+  // sweep catches all of it.
+  document.querySelectorAll(".bubble").forEach(updateBubbleAria);
 }
 
 function collectPreferences() {
@@ -424,6 +451,8 @@ function toggleFavorite(templateId) {
   document.querySelectorAll(`.favorite-btn[data-template-id="${templateId}"]`).forEach(btn => {
     btn.textContent = nowFavorite ? "❤️" : "🤍";
     btn.classList.toggle("active", nowFavorite);
+    btn.setAttribute("aria-label", nowFavorite ? "Remove from favorites" : "Favorite this meal");
+    btn.setAttribute("aria-pressed", nowFavorite ? "true" : "false");
   });
   return nowFavorite;
 }
@@ -541,6 +570,11 @@ function initOnboarding() {
     const btn = e.target.closest(".bubble");
     if (btn) $("#obMealPrepDetails").classList.toggle("hidden", btn.dataset.value !== "yes");
   });
+
+  // Establishes correct aria-pressed/aria-label for whatever's selected by
+  // default in the static HTML (e.g. "No, keep it varied") before any
+  // click or prefill has run.
+  document.querySelectorAll(".bubble").forEach(updateBubbleAria);
 
   syncSlider("#obCalories", "#obCaloriesSlider");
   syncSlider("#obBudgetAmount", "#obBudgetAmountSlider");
@@ -678,7 +712,7 @@ function renderMealCard(meal, dayIndex, mealIndex) {
         <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Edit this meal" title="Edit this meal">✏️</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Replace with an auto-picked meal" title="Replace with an auto-picked meal">↩️</button>`
     : `
-        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="Favorite this meal" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
+        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
         <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Log your own meal instead" title="Log your own meal instead">📝</button>`;
 
@@ -1148,7 +1182,11 @@ let currentPlanResult = null;
 
 function activateDay(dayNum) {
   activeDayNum = dayNum;
-  document.querySelectorAll(".day-tab").forEach(b => b.classList.toggle("active", Number(b.dataset.day) === dayNum));
+  document.querySelectorAll(".day-tab").forEach(b => {
+    const isActive = Number(b.dataset.day) === dayNum;
+    b.classList.toggle("active", isActive);
+    b.setAttribute("aria-current", isActive ? "true" : "false");
+  });
   document.querySelectorAll(".day-view").forEach(v => v.classList.toggle("active", Number(v.dataset.day) === dayNum));
 }
 

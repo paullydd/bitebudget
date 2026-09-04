@@ -36,7 +36,7 @@
   <main>
     <section id="welcomeScreen" class="panel welcome-screen">
       <img src="icons/icon.svg" alt="BiteBudget logo" class="welcome-icon">
-      <h1 class="welcome-title">BiteBudget</h1>
+      <h2 class="welcome-title">BiteBudget</h2>
       <p class="welcome-tagline">Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
       <p id="welcomeQuote" class="welcome-quote"></p>
       <button type="button" id="getStartedBtn" class="primary-btn welcome-cta">Get Started</button>
@@ -67,8 +67,8 @@
         <p class="wizard-hint">Pick up to 3 styles per meal — tap a style again to rule it out entirely, or leave it at "No preference."</p>
 
         <div class="wizard-slot">
-          <div class="wizard-slot-label">Breakfast</div>
-          <div class="bubble-group" id="styleBreakfast" data-slot="breakfast">
+          <div class="wizard-slot-label" id="styleBreakfastLabel">Breakfast</div>
+          <div class="bubble-group" id="styleBreakfast" data-slot="breakfast" role="group" aria-labelledby="styleBreakfastLabel">
             <button type="button" class="bubble" data-value="eggs">🍳 Eggs &amp; savory</button>
             <button type="button" class="bubble" data-value="dairy_bowl">🥣 Yogurt/cottage cheese bowl</button>
             <button type="button" class="bubble" data-value="oats">🌾 Oats</button>
@@ -76,8 +76,8 @@
           </div>
         </div>
         <div class="wizard-slot">
-          <div class="wizard-slot-label">Lunch</div>
-          <div class="bubble-group" id="styleLunch" data-slot="lunch">
+          <div class="wizard-slot-label" id="styleLunchLabel">Lunch</div>
+          <div class="bubble-group" id="styleLunch" data-slot="lunch" role="group" aria-labelledby="styleLunchLabel">
             <button type="button" class="bubble" data-value="bowl">🥣 Bowl</button>
             <button type="button" class="bubble" data-value="wrap_sandwich">🥪 Wrap/sandwich</button>
             <button type="button" class="bubble" data-value="stir_fry">🥘 Stir-fry</button>
@@ -87,8 +87,8 @@
           </div>
         </div>
         <div class="wizard-slot">
-          <div class="wizard-slot-label">Dinner</div>
-          <div class="bubble-group" id="styleDinner" data-slot="dinner">
+          <div class="wizard-slot-label" id="styleDinnerLabel">Dinner</div>
+          <div class="bubble-group" id="styleDinner" data-slot="dinner" role="group" aria-labelledby="styleDinnerLabel">
             <button type="button" class="bubble" data-value="bowl">🥣 Bowl</button>
             <button type="button" class="bubble" data-value="wrap_sandwich">🥪 Wrap/sandwich</button>
             <button type="button" class="bubble" data-value="stir_fry">🥘 Stir-fry</button>
@@ -104,16 +104,16 @@
         <p class="wizard-hint">Your "favorite song" — pick which meal it's for, then the closest match.</p>
 
         <div class="wizard-slot">
-          <div class="wizard-slot-label">Which meal?</div>
-          <div class="bubble-group" id="signatureSlot">
+          <div class="wizard-slot-label" id="signatureSlotLabel">Which meal?</div>
+          <div class="bubble-group" id="signatureSlot" role="group" aria-labelledby="signatureSlotLabel">
             <button type="button" class="bubble" data-value="breakfast">Breakfast</button>
             <button type="button" class="bubble" data-value="lunch">Lunch</button>
             <button type="button" class="bubble" data-value="dinner">Dinner</button>
           </div>
         </div>
         <div class="wizard-slot">
-          <div class="wizard-slot-label">Closest match</div>
-          <div class="bubble-group" id="signaturePreset">
+          <div class="wizard-slot-label" id="signaturePresetLabel">Closest match</div>
+          <div class="bubble-group" id="signaturePreset" role="group" aria-labelledby="signaturePresetLabel">
             <button type="button" class="bubble" data-value="eggs_meat">🍳 Eggs &amp; meat</button>
             <button type="button" class="bubble" data-value="yogurt_oats">🥣 Yogurt or oats</button>
             <button type="button" class="bubble" data-value="chicken_rice">🍗 Chicken &amp; rice</button>
@@ -161,7 +161,7 @@
         <div id="obMealPrepDetails" class="hidden">
           <p class="wizard-hint">How many times a week for each meal? Leave at "No meal prep" to skip it.</p>
           <div class="wizard-slot">
-            <div class="wizard-slot-label">Breakfast</div>
+            <label class="wizard-slot-label" for="obPrepBreakfast">Breakfast</label>
             <select id="obPrepBreakfast">
               <option value="0">No meal prep</option>
               <option value="2">2× this week</option>
@@ -173,7 +173,7 @@
             </select>
           </div>
           <div class="wizard-slot">
-            <div class="wizard-slot-label">Lunch</div>
+            <label class="wizard-slot-label" for="obPrepLunch">Lunch</label>
             <select id="obPrepLunch">
               <option value="0">No meal prep</option>
               <option value="2">2× this week</option>
@@ -185,7 +185,7 @@
             </select>
           </div>
           <div class="wizard-slot">
-            <div class="wizard-slot-label">Dinner</div>
+            <label class="wizard-slot-label" for="obPrepDinner">Dinner</label>
             <select id="obPrepDinner">
               <option value="0">No meal prep</option>
               <option value="2">2× this week</option>
@@ -252,7 +252,7 @@
               </div>
             </div>
 
-            <div id="budgetWarning" class="warning-banner hidden"></div>
+            <div id="budgetWarning" class="warning-banner hidden" aria-live="polite"></div>
           </div>
         </details>
 
@@ -283,7 +283,7 @@
             </div>
             <p class="macro-hint" style="margin-top: 12px;">🧺 Meal prep — repeat one recipe in bigger batches for whichever meals you want, instead of a new recipe most days. Also asked during onboarding ("🎯 Preferences").</p>
             <div class="wizard-slot">
-              <div class="wizard-slot-label">Breakfast</div>
+              <label class="wizard-slot-label" for="prepBreakfast">Breakfast</label>
               <select id="prepBreakfast">
                 <option value="0">No meal prep</option>
                 <option value="2">2× this week</option>
@@ -295,7 +295,7 @@
               </select>
             </div>
             <div class="wizard-slot">
-              <div class="wizard-slot-label">Lunch</div>
+              <label class="wizard-slot-label" for="prepLunch">Lunch</label>
               <select id="prepLunch">
                 <option value="0">No meal prep</option>
                 <option value="2">2× this week</option>
@@ -307,7 +307,7 @@
               </select>
             </div>
             <div class="wizard-slot">
-              <div class="wizard-slot-label">Dinner</div>
+              <label class="wizard-slot-label" for="prepDinner">Dinner</label>
               <select id="prepDinner">
                 <option value="0">No meal prep</option>
                 <option value="2">2× this week</option>

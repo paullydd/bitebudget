@@ -44,6 +44,9 @@ const MEAL_TEMPLATES = [
   { id: "b13", slot: "breakfast", style: "dairy_bowl", name: "Cottage Cheese Berry Bowl", prepTime: 3, cookTime: 0,
     items: [{ food: "cottage_cheese", grams: 200 }, { food: "blueberries", grams: 70 }, { food: "granola", grams: 25 }],
     instructions: ["Spoon the cottage cheese into a bowl.", "Top with the blueberries and a sprinkle of granola for crunch.", "Serve chilled."] },
+  { id: "b14", slot: "breakfast", style: "oats", name: "Berry Overnight Oats", prepTime: 5, cookTime: 0,
+    items: [{ food: "oats", grams: 50 }, { food: "almond_milk", grams: 180 }, { food: "blueberries", grams: 60 }, { food: "almonds", grams: 15 }],
+    instructions: ["Stir the oats and almond milk together in a jar.", "Cover and refrigerate overnight, or at least 2 hours, until softened.", "Top with blueberries and almonds before eating."] },
 
   // ---------- LUNCH ----------
   { id: "l1", slot: "lunch", style: "bowl", name: "Chicken & Rice Bowl", prepTime: 5, cookTime: 15,
@@ -94,6 +97,9 @@ const MEAL_TEMPLATES = [
   { id: "l16", slot: "lunch", style: "salad", name: "Salmon Spinach Salad", prepTime: 5, cookTime: 10,
     items: [{ food: "salmon", grams: 120 }, { food: "spinach", grams: 100 }, { food: "carrots", grams: 50 }, { food: "olive_oil", grams: 5 }],
     instructions: ["Season the salmon with salt and pepper.", "Pan-sear or bake until it flakes easily, about 8-10 minutes.", "Toss the spinach and shredded carrots with olive oil.", "Top with the salmon and serve."] },
+  { id: "l17", slot: "lunch", style: "wrap_sandwich", name: "Turkey Avocado Wrap", prepTime: 5, cookTime: 0,
+    items: [{ food: "turkey_breast", grams: 100 }, { food: "tortilla", grams: 60 }, { food: "avocado", grams: 50 }, { food: "spinach", grams: 40 }],
+    instructions: ["Mash the avocado with a pinch of salt and pepper.", "Spread the mashed avocado over the tortilla.", "Layer the turkey and spinach on top, then roll up tightly.", "Slice in half and serve."] },
 
   // ---------- DINNER ----------
   { id: "d1", slot: "dinner", style: "bowl", name: "Baked Salmon with Sweet Potato", prepTime: 8, cookTime: 25,
@@ -147,6 +153,9 @@ const MEAL_TEMPLATES = [
   { id: "d17", slot: "dinner", style: "soup", name: "Chicken Tortilla Soup", prepTime: 5, cookTime: 15,
     items: [{ food: "chicken_breast", grams: 120 }, { food: "black_beans", grams: 100 }, { food: "bell_pepper", grams: 60 }, { food: "tortilla", grams: 40 }],
     instructions: ["Dice the chicken breast and cook in a pot over medium heat until browned, about 5 minutes.", "Add the black beans, diced bell pepper, and a splash of broth; simmer 10 minutes.", "Tear the tortilla into strips and stir in during the last 2 minutes to soften slightly.", "Season with salt and pepper and serve hot."] },
+  { id: "d18", slot: "dinner", style: "bowl", name: "Baked Chicken & Broccoli", prepTime: 8, cookTime: 22,
+    items: [{ food: "chicken_breast", grams: 150 }, { food: "broccoli", grams: 120 }, { food: "sweet_potato", grams: 150 }, { food: "olive_oil", grams: 5 }],
+    instructions: ["Preheat the oven to 400°F.", "Cube the sweet potato, toss with olive oil, and spread on a baking sheet; roast 15 minutes.", "Add the seasoned chicken breast to the same sheet and roast another 15-18 minutes, until cooked through.", "Steam the broccoli in the last 5 minutes and plate everything together."] },
 
   // ---------- SNACK ----------
   { id: "s1", slot: "snack", prepTime: 2, cookTime: 0, name: "Apple & Almonds",
@@ -188,4 +197,13 @@ const MEAL_TEMPLATES = [
   { id: "s13", slot: "snack", prepTime: 3, cookTime: 0, name: "Peanut Butter & Apple Slices",
     items: [{ food: "apple", grams: 150 }, { food: "peanut_butter", grams: 20 }],
     instructions: ["Slice the apple into wedges.", "Serve with peanut butter for dipping."] },
+  { id: "s14", slot: "snack", prepTime: 2, cookTime: 0, name: "Protein Shake",
+    items: [{ food: "protein_powder", grams: 30 }, { food: "almond_milk", grams: 250 }],
+    instructions: ["Add the protein powder and almond milk to a shaker bottle or blender.", "Shake or blend until smooth.", "Serve immediately."] },
+  { id: "s15", slot: "snack", prepTime: 1, cookTime: 0, name: "Protein Bar",
+    items: [{ food: "protein_bar", grams: 60 }],
+    instructions: ["Unwrap and enjoy."] },
+  { id: "s16", slot: "snack", prepTime: 10, cookTime: 0, name: "Peanut Butter Protein Balls",
+    items: [{ food: "oats", grams: 40 }, { food: "peanut_butter", grams: 30 }, { food: "protein_powder", grams: 20 }],
+    instructions: ["Combine the oats, peanut butter, and protein powder in a bowl and mix until a thick dough forms (add a splash of almond milk if it's too dry).", "Roll into bite-sized balls.", "Chill in the fridge for at least 20 minutes to firm up before eating."] },
 ];

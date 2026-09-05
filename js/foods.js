@@ -49,6 +49,9 @@ const FOODS = {
   edamame:         { name: "Edamame",             protein: 11,   carbs: 10,   fat: 5,    price: 0.50, veg: true, category: "Protein", proteinFamily: "plant" },
   protein_powder:  { name: "Protein Powder",      protein: 80,   carbs: 8,    fat: 5,    price: 3.50, veg: true, category: "Pantry & Grains", proteinFamily: "dairy" },
   protein_bar:     { name: "Protein Bar",         protein: 33,   carbs: 24,   fat: 13,   price: 3.50, veg: true, category: "Pantry & Grains" },
+  caesar_dressing: { name: "Caesar Dressing",     protein: 2,    carbs: 3,    fat: 48,   price: 1.30, veg: true, category: "Pantry & Grains" },
+  parmesan_cheese: { name: "Parmesan Cheese",     protein: 38,   carbs: 4,    fat: 29,   price: 1.90, veg: true, category: "Dairy", proteinFamily: "dairy" },
+  soy_sauce:       { name: "Soy Sauce",           protein: 8,    carbs: 8,    fat: 0,    price: 0.55, veg: true, category: "Pantry & Grains" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.

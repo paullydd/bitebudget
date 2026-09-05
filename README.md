@@ -22,6 +22,10 @@ that runs in any modern browser.
   salad) at both lunch and dinner, plus high-protein snacks (protein shake,
   protein bar, peanut butter protein balls) for hitting a protein target
   without another full meal, so you don't get the same meal twice in a row.
+  Every recipe is checked against what its own name promises — a "Caesar"
+  actually has Caesar dressing and parmesan, every stir-fry has a real
+  sauce — no dish is missing the ingredient that makes it what it says it
+  is.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient

@@ -9,6 +9,12 @@ that runs in any modern browser.
 
 ## What it does
 
+- **Navigation menu** — ⚙️ Settings, 📅 Your Week, and 🛒 Shopping List are
+  three separate sections reachable from a nav bar instead of one long
+  scrolling page. "Your Week" and "Shopping List" stay disabled until a
+  plan actually exists; generating one switches you there automatically,
+  and everything else (shuffling, swapping a meal, editing prices) leaves
+  you exactly where you were instead of jumping you around.
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
   day for a plan of 1–14 days, rotating through 65 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3

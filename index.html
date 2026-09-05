@@ -34,6 +34,12 @@
   <div id="progressStrip" class="progress-strip hidden"></div>
 
   <main>
+    <nav id="appNav" class="app-nav hidden" aria-label="App sections">
+      <button type="button" class="app-nav-btn" data-section="settings">⚙️ Settings</button>
+      <button type="button" class="app-nav-btn" data-section="week" disabled>📅 Your Week</button>
+      <button type="button" class="app-nav-btn" data-section="shopping" disabled>🛒 Shopping List</button>
+    </nav>
+
     <section id="welcomeScreen" class="panel welcome-screen">
       <img src="icons/icon.svg" alt="BiteBudget logo" class="welcome-icon">
       <h2 class="welcome-title">BiteBudget</h2>
@@ -325,7 +331,7 @@
       </form>
     </section>
 
-    <section id="results" class="panel hidden">
+    <section id="resultsWeek" class="panel hidden">
       <div class="results-head">
         <h2>Your Plan</h2>
         <div class="results-head-buttons">
@@ -348,9 +354,11 @@
 
       <div id="dayTabs" class="day-tabs"></div>
       <div id="dayViews"></div>
+    </section>
 
+    <section id="resultsShopping" class="panel hidden">
       <div class="shopping-head">
-        <h3>Weekly Shopping List</h3>
+        <h2>Weekly Shopping List</h2>
         <button type="button" id="printListBtn" class="secondary-btn">🖨️ Print Shopping List</button>
       </div>
       <div id="shoppingList"></div>

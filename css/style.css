@@ -507,6 +507,29 @@ form { display: flex; flex-direction: column; gap: 16px; }
 }
 .day-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
 
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.app-nav-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 10px 18px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.app-nav-btn:hover:not(:disabled) { background: var(--hover-bg); }
+.app-nav-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+.app-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 .day-view { display: none; }
 .day-view.active { display: block; }
 
@@ -674,7 +697,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
 }
 
 .shopping-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.shopping-head h3 { margin: 0; }
+.shopping-head h2 { margin: 0; }
 
 .shopping-group { margin-top: 16px; }
 .shopping-group:first-child { margin-top: 10px; }
@@ -728,25 +751,20 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
   }
   body.print-shopping-list .app-header,
   body.print-shopping-list #progressStrip,
-  body.print-shopping-list .panel:not(#results),
-  body.print-shopping-list .results-head,
-  body.print-shopping-list #planMeta,
-  body.print-shopping-list #weekOverviewHeading,
-  body.print-shopping-list #weekOverview,
-  body.print-shopping-list #dayTabs,
-  body.print-shopping-list #dayViews,
+  body.print-shopping-list #appNav,
+  body.print-shopping-list .panel:not(#resultsShopping),
   body.print-shopping-list #printListBtn,
   body.print-shopping-list footer {
     display: none !important;
   }
-  body.print-shopping-list #results {
+  body.print-shopping-list #resultsShopping {
     border: none;
     padding: 0;
   }
 
   /* Full meal-plan booklet is a separate document from the app UI, so
      hiding every other top-level element is simpler than the selective
-     hiding print-shopping-list needs (it stays inside #results). */
+     hiding print-shopping-list needs (it stays inside #resultsShopping). */
   .print-booklet { display: none; }
   body.print-full-plan > *:not(#printBooklet) { display: none !important; }
   body.print-full-plan .print-booklet {

@@ -278,12 +278,14 @@ function showOnboarding() {
   hideWelcome();
   goToWizardStep(1);
   $("#onboarding").classList.remove("hidden");
-  $("#settingsPanel").classList.add("hidden");
+  $("#appNav").classList.add("hidden");
+  Object.values(SECTION_IDS).forEach(id => $(`#${id}`).classList.add("hidden"));
 }
 
 function hideOnboarding() {
   $("#onboarding").classList.add("hidden");
-  $("#settingsPanel").classList.remove("hidden");
+  $("#appNav").classList.remove("hidden");
+  showSection(activeSection);
 }
 
 function clearBubbleSelections() {
@@ -1140,7 +1142,8 @@ function renderPlan(result) {
   $("#shoppingList").innerHTML = renderShoppingList(shoppingList, summary.totalCost, summary.totalBudget);
 
   activateDay(activeDayNum);
-  $("#results").classList.remove("hidden");
+  $('.app-nav-btn[data-section="week"]').disabled = false;
+  $('.app-nav-btn[data-section="shopping"]').disabled = false;
 
   recordRecipesTried(plan);
   renderProgressStrip();
@@ -1177,6 +1180,26 @@ function renderAchievements() {
   }).join("");
 }
 
+const SECTION_IDS = { settings: "settingsPanel", week: "resultsWeek", shopping: "resultsShopping" };
+let activeSection = "settings";
+
+// Switches which top-level section is visible — same show/hide-by-id
+// pattern the rest of the app already uses (welcome/onboarding/settings),
+// just generalized to three sections plus a nav bar to pick between them.
+function showSection(name) {
+  if (!SECTION_IDS[name]) return;
+  activeSection = name;
+  Object.entries(SECTION_IDS).forEach(([sectionName, id]) => {
+    $(`#${id}`).classList.toggle("hidden", sectionName !== name);
+  });
+  document.querySelectorAll(".app-nav-btn").forEach(b => {
+    const isActive = b.dataset.section === name;
+    b.classList.toggle("active", isActive);
+    b.setAttribute("aria-current", isActive ? "true" : "false");
+  });
+  $(`#${SECTION_IDS[name]}`).scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 let activeDayNum = 1;
 let currentPlanResult = null;
 
@@ -1209,6 +1232,14 @@ function init() {
   const savedPlan = localStorage.getItem(PLAN_KEY);
   if (savedPlan) renderPlan(recomputeAllCosts(JSON.parse(savedPlan)));
   else renderProgressStrip();
+  activeSection = savedPlan ? "week" : "settings";
+  showSection(activeSection);
+
+  document.querySelectorAll(".app-nav-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!btn.disabled) showSection(btn.dataset.section);
+    });
+  });
 
   $("#planForm").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1220,7 +1251,7 @@ function init() {
     recordNewHistoryEntry(result.summary);
     localStorage.setItem(PLAN_KEY, JSON.stringify(result));
     renderPlan(result);
-    $("#results").scrollIntoView({ behavior: "smooth" });
+    showSection("week");
   });
 
   $("#regenerateBtn").addEventListener("click", () => {

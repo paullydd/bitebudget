@@ -52,6 +52,20 @@ const FOODS = {
   caesar_dressing: { name: "Caesar Dressing",     protein: 2,    carbs: 3,    fat: 48,   price: 1.30, veg: true, category: "Pantry & Grains" },
   parmesan_cheese: { name: "Parmesan Cheese",     protein: 38,   carbs: 4,    fat: 29,   price: 1.90, veg: true, category: "Dairy", proteinFamily: "dairy" },
   soy_sauce:       { name: "Soy Sauce",           protein: 8,    carbs: 8,    fat: 0,    price: 0.55, veg: true, category: "Pantry & Grains" },
+  egg_whites:      { name: "Egg Whites",          protein: 11,   carbs: 0.7,  fat: 0.2,  price: 1.00, veg: true, category: "Protein", proteinFamily: "egg" },
+  canadian_bacon:  { name: "Canadian Bacon",      protein: 22,   carbs: 1,    fat: 4,    price: 1.20, veg: false, category: "Protein", proteinFamily: "red_meat" },
+  onion:           { name: "Onion",               protein: 1.1,  carbs: 9,    fat: 0.1,  price: 0.15, veg: true, category: "Produce" },
+  low_fat_cheddar: { name: "Low-Fat Cheddar",     protein: 28,   carbs: 2,    fat: 15,   price: 1.30, veg: true, category: "Dairy", proteinFamily: "dairy" },
+  potato:          { name: "Potato",              protein: 2,    carbs: 17,   fat: 0.1,  price: 0.20, veg: true, category: "Produce" },
+  salsa:           { name: "Salsa",               protein: 1.5,  carbs: 6,    fat: 0.2,  price: 0.60, veg: true, category: "Pantry & Grains" },
+  ground_turkey:   { name: "Ground Turkey",       protein: 19,   carbs: 0,    fat: 10,   price: 0.90, veg: false, category: "Protein", proteinFamily: "poultry" },
+  lettuce:         { name: "Lettuce",             protein: 1.4,  carbs: 2.9,  fat: 0.2,  price: 0.30, veg: true, category: "Produce" },
+  cucumber:        { name: "Cucumber",            protein: 0.7,  carbs: 3.6,  fat: 0.1,  price: 0.30, veg: true, category: "Produce" },
+  sriracha_mayo:   { name: "Sriracha Mayo (Light)", protein: 1,  carbs: 6,    fat: 30,   price: 1.00, veg: true, category: "Pantry & Grains" },
+  lemon:           { name: "Lemon",               protein: 1.1,  carbs: 9,    fat: 0.3,  price: 0.55, veg: true, category: "Produce" },
+  green_beans:     { name: "Green Beans",         protein: 1.8,  carbs: 7,    fat: 0.2,  price: 0.45, veg: true, category: "Produce" },
+  rice_cakes:      { name: "Rice Cakes",          protein: 8,    carbs: 81,   fat: 3,    price: 0.70, veg: true, category: "Pantry & Grains" },
+  popcorn:         { name: "Popcorn (air-popped)", protein: 13,  carbs: 78,   fat: 4,    price: 0.40, veg: true, category: "Pantry & Grains" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.

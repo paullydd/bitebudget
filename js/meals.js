@@ -47,6 +47,15 @@ const MEAL_TEMPLATES = [
   { id: "b14", slot: "breakfast", style: "oats", name: "Berry Overnight Oats", prepTime: 5, cookTime: 0,
     items: [{ food: "oats", grams: 50 }, { food: "almond_milk", grams: 180 }, { food: "blueberries", grams: 60 }, { food: "almonds", grams: 15 }],
     instructions: ["Stir the oats and almond milk together in a jar.", "Cover and refrigerate overnight, or at least 2 hours, until softened.", "Top with blueberries and almonds before eating."] },
+  { id: "b15", slot: "breakfast", style: "eggs", name: "Classic Lean Breakfast", prepTime: 5, cookTime: 8,
+    items: [{ food: "egg", grams: 100 }, { food: "egg_whites", grams: 150 }, { food: "canadian_bacon", grams: 60 }, { food: "whole_wheat_bread", grams: 70 }, { food: "banana", grams: 90 }],
+    instructions: ["Lightly coat a pan with cooking spray and heat over medium heat.", "Cook the Canadian bacon 2-3 minutes per side, until lightly browned; set aside.", "Whisk the eggs and egg whites together in a bowl, then scramble in the same pan until just set, 3-4 minutes.", "Toast the bread until golden.", "Serve the eggs and Canadian bacon with the toast and sliced banana on the side."] },
+  { id: "b16", slot: "breakfast", style: "eggs", name: "Loaded Veggie Omelet", prepTime: 8, cookTime: 9,
+    items: [{ food: "egg", grams: 150 }, { food: "egg_whites", grams: 120 }, { food: "spinach", grams: 40 }, { food: "bell_pepper", grams: 50 }, { food: "onion", grams: 40 }, { food: "low_fat_cheddar", grams: 30 }],
+    instructions: ["Dice the bell pepper and onion.", "Sauté the peppers and onion in a lightly oiled pan over medium heat until softened, about 4-5 minutes.", "Add the spinach and cook until just wilted, about 1 minute; remove the vegetables from the pan.", "Whisk the eggs and egg whites together, then pour into the pan and let set for about 1 minute.", "Spoon the vegetables and cheese over half the eggs, then fold the omelet over and cook until the cheese melts, 1-2 minutes."] },
+  { id: "b17", slot: "breakfast", style: "eggs", name: "Breakfast Burrito Bowl", prepTime: 8, cookTime: 22,
+    items: [{ food: "egg", grams: 100 }, { food: "egg_whites", grams: 180 }, { food: "potato", grams: 150 }, { food: "breakfast_sausage", grams: 60 }, { food: "salsa", grams: 40 }, { food: "avocado", grams: 50 }],
+    instructions: ["Preheat the oven (or air fryer) to 425°F.", "Dice the potatoes, toss with a little oil, and roast or air fry for 20-25 minutes, shaking halfway, until crisp and tender.", "Cook the turkey sausage in a pan over medium heat, breaking it up, until browned and cooked through, about 6-7 minutes.", "Whisk the eggs and egg whites together and scramble in the same pan until just set, 3-4 minutes.", "Build the bowl with the potatoes, sausage, and eggs, then top with salsa and sliced avocado."] },
 
   // ---------- LUNCH ----------
   { id: "l1", slot: "lunch", style: "bowl", name: "Chicken & Rice Bowl", prepTime: 5, cookTime: 15,
@@ -100,6 +109,15 @@ const MEAL_TEMPLATES = [
   { id: "l17", slot: "lunch", style: "wrap_sandwich", name: "Turkey Avocado Wrap", prepTime: 5, cookTime: 0,
     items: [{ food: "turkey_breast", grams: 100 }, { food: "tortilla", grams: 60 }, { food: "avocado", grams: 50 }, { food: "spinach", grams: 40 }],
     instructions: ["Mash the avocado with a pinch of salt and pepper.", "Spread the mashed avocado over the tortilla.", "Layer the turkey and spinach on top, then roll up tightly.", "Slice in half and serve."] },
+  { id: "l18", slot: "lunch", style: "bowl", name: "Salsa Chicken Bowls", prepTime: 10, cookTime: 240,
+    items: [{ food: "chicken_breast", grams: 150 }, { food: "salsa", grams: 60 }, { food: "brown_rice", grams: 180 }, { food: "bell_pepper", grams: 50 }, { food: "onion", grams: 30 }, { food: "lettuce", grams: 40 }],
+    instructions: ["Add the chicken breast, salsa, and taco seasoning to a slow cooker.", "Cook on LOW for 6-7 hours or HIGH for 4 hours, until the chicken shreds easily with a fork.", "Shred the chicken directly in the slow cooker, stirring it back into the salsa.", "Meanwhile, sauté the diced peppers and onion in a pan until softened, about 5 minutes.", "Serve the shredded chicken over rice with the peppers, onion, and shredded lettuce."] },
+  { id: "l19", slot: "lunch", style: "bowl", name: "Salmon Rice Bowls", prepTime: 8, cookTime: 15,
+    items: [{ food: "salmon", grams: 150 }, { food: "brown_rice", grams: 180 }, { food: "cucumber", grams: 50 }, { food: "avocado", grams: 50 }, { food: "edamame", grams: 60 }, { food: "soy_sauce", grams: 10 }, { food: "sriracha_mayo", grams: 15 }],
+    instructions: ["Season the salmon with salt, pepper, and garlic powder.", "Bake at 400°F for 12-15 minutes, until it flakes easily with a fork.", "Meanwhile, cook the rice and steam the edamame.", "Slice the cucumber and avocado.", "Assemble the bowl with rice, salmon, cucumber, avocado, and edamame, drizzled with soy sauce and sriracha mayo."] },
+  { id: "l20", slot: "lunch", style: "bowl", name: "Turkey Taco Bowls", prepTime: 8, cookTime: 12,
+    items: [{ food: "ground_turkey", grams: 150 }, { food: "brown_rice", grams: 180 }, { food: "bell_pepper", grams: 50 }, { food: "onion", grams: 30 }, { food: "salsa", grams: 40 }, { food: "lettuce", grams: 30 }, { food: "greek_yogurt", grams: 30 }],
+    instructions: ["Brown the ground turkey in a skillet over medium heat, breaking it up, about 6-7 minutes.", "Add taco seasoning and stir to coat.", "Add the diced peppers and onion; cook until softened, about 5 minutes.", "Serve over rice, topped with salsa, shredded lettuce, and a dollop of Greek yogurt."] },
 
   // ---------- DINNER ----------
   { id: "d1", slot: "dinner", style: "bowl", name: "Baked Salmon with Sweet Potato", prepTime: 8, cookTime: 25,
@@ -156,6 +174,15 @@ const MEAL_TEMPLATES = [
   { id: "d18", slot: "dinner", style: "bowl", name: "Baked Chicken & Broccoli", prepTime: 8, cookTime: 22,
     items: [{ food: "chicken_breast", grams: 150 }, { food: "broccoli", grams: 120 }, { food: "sweet_potato", grams: 150 }, { food: "olive_oil", grams: 5 }],
     instructions: ["Preheat the oven to 400°F.", "Cube the sweet potato, toss with olive oil, and spread on a baking sheet; roast 15 minutes.", "Add the seasoned chicken breast to the same sheet and roast another 15-18 minutes, until cooked through.", "Steam the broccoli in the last 5 minutes and plate everything together."] },
+  { id: "d19", slot: "dinner", style: "bowl", name: "Salmon, Potatoes & Green Beans", prepTime: 10, cookTime: 32,
+    items: [{ food: "salmon", grams: 150 }, { food: "potato", grams: 200 }, { food: "green_beans", grams: 100 }, { food: "olive_oil", grams: 8 }, { food: "lemon", grams: 20 }],
+    instructions: ["Preheat the oven to 425°F.", "Toss the potatoes with olive oil, garlic powder, salt, and pepper; roast for 30 minutes.", "Push the potatoes aside, add the salmon and green beans to the same sheet, and roast a final 12-15 minutes, until the salmon flakes easily.", "Squeeze fresh lemon over the salmon before serving."] },
+  { id: "d20", slot: "dinner", style: "bowl", name: "Chicken & Roasted Veggies", prepTime: 8, cookTime: 20,
+    items: [{ food: "chicken_breast", grams: 150 }, { food: "broccoli", grams: 120 }, { food: "potato", grams: 180 }, { food: "olive_oil", grams: 8 }],
+    instructions: ["Season the chicken breast with olive oil, garlic powder, salt, and pepper.", "Air fry or bake the chicken at 400°F until it reaches 165°F internal, about 18-20 minutes.", "Toss the potatoes and broccoli with olive oil and roast alongside (or in a separate pan) until tender.", "Serve the chicken with the roasted vegetables."] },
+  { id: "d21", slot: "dinner", style: "bowl", name: "Turkey Skillet", prepTime: 8, cookTime: 14,
+    items: [{ food: "ground_turkey", grams: 150 }, { food: "bell_pepper", grams: 60 }, { food: "onion", grams: 40 }, { food: "brown_rice", grams: 180 }],
+    instructions: ["Brown the ground turkey in a skillet over medium heat, breaking it up, about 6-7 minutes.", "Add the diced peppers and onion; cook until softened, about 5 minutes.", "Stir in taco seasoning.", "Serve over rice."] },
 
   // ---------- SNACK ----------
   { id: "s1", slot: "snack", prepTime: 2, cookTime: 0, name: "Apple & Almonds",
@@ -206,4 +233,10 @@ const MEAL_TEMPLATES = [
   { id: "s16", slot: "snack", prepTime: 10, cookTime: 0, name: "Peanut Butter Protein Balls",
     items: [{ food: "oats", grams: 40 }, { food: "peanut_butter", grams: 30 }, { food: "protein_powder", grams: 20 }],
     instructions: ["Combine the oats, peanut butter, and protein powder in a bowl and mix until a thick dough forms (add a splash of almond milk if it's too dry).", "Roll into bite-sized balls.", "Chill in the fridge for at least 20 minutes to firm up before eating."] },
+  { id: "s17", slot: "snack", prepTime: 2, cookTime: 0, name: "Rice Cakes with Peanut Butter",
+    items: [{ food: "rice_cakes", grams: 20 }, { food: "peanut_butter", grams: 16 }],
+    instructions: ["Spread peanut butter over the rice cakes.", "Serve immediately."] },
+  { id: "s18", slot: "snack", prepTime: 3, cookTime: 3, name: "Popcorn",
+    items: [{ food: "popcorn", grams: 30 }],
+    instructions: ["Air-pop the popcorn according to your popper's instructions, or pop on the stovetop with a small amount of oil.", "Season with a pinch of salt if desired."] },
 ];

@@ -16,16 +16,16 @@ that runs in any modern browser.
   and everything else (shuffling, swapping a meal, editing prices) leaves
   you exactly where you were instead of jumping you around.
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 76 built-in recipe templates
+  day for a plan of 1–14 days, rotating through 91 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3
-  templates for every meal style (bowl, wrap/sandwich, stir-fry, soup,
-  salad) at both lunch and dinner, plus high-protein snacks (protein shake,
-  protein bar, peanut butter protein balls, rice cakes with peanut butter,
-  popcorn) for hitting a protein target without another full meal, so you
-  don't get the same meal twice in a row. Every recipe is checked against
-  what its own name promises — a "Caesar" actually has Caesar dressing and
-  parmesan, every stir-fry has a real sauce — no dish is missing the
-  ingredient that makes it what it says it is.
+  templates for every meal style (bowl, wrap/sandwich, stir-fry, soup, salad,
+  smoothie) at both lunch and dinner, plus high-protein snacks (protein
+  shake, protein bar, peanut butter protein balls, rice cakes with peanut
+  butter, popcorn) for hitting a protein target without another full meal,
+  so you don't get the same meal twice in a row. Every recipe is checked
+  against what its own name promises — a "Caesar" actually has Caesar
+  dressing and parmesan, every stir-fry has a real sauce — no dish is
+  missing the ingredient that makes it what it says it is.
 - **Calorie & macro tracking** — set a daily calorie target and a
   protein/carb/fat split; every meal and day shows calories, protein, carbs,
   and fat (MyFitnessPal-style breakdown), scaled from the ingredient
@@ -42,7 +42,12 @@ that runs in any modern browser.
   cramped inline expand — full ingredient list with measurements, a
   prep/cook time line, and detailed, numbered steps (specific
   temperatures, timing, and visual doneness cues, not just "cook until
-  done") so a recipe can actually be followed start to finish.
+  done") so a recipe can actually be followed start to finish. Ingredient
+  amounts always show as a kitchen-friendly serving ("6 oz chicken breast",
+  "1 cup rice", "2 eggs") instead of a raw gram figure — it's computed live
+  from the underlying grams (which still drive every nutrition number
+  behind the scenes), so it's still exactly right after the planner scales
+  a recipe up or down to hit your calorie target.
 - **Shopping list** — aggregates all ingredients across the whole plan into
   one list with quantities and total estimated cost.
 - **Vegetarian filter** and a "shuffle" button to regenerate with more

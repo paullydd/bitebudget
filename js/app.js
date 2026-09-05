@@ -898,7 +898,7 @@ function openRecipeModal(meal) {
   $("#recipeFavoriteBtn").textContent = favorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
   $("#recipeFavoriteBtn").classList.toggle("active", favorite);
   $("#nutritionLabel").innerHTML = renderNutritionLabel(n);
-  $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("");
+  $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("");
   $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${s}</li>`).join("");
   $("#recipeModal").showModal();
 }
@@ -1015,7 +1015,7 @@ function renderPrintBooklet(result) {
           <div class="booklet-meal-body">
             <div>
               <strong>Ingredients</strong>
-              <ul>${m.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("")}</ul>
+              <ul>${m.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
             </div>
             <div>
               <strong>Instructions</strong>
@@ -1039,7 +1039,7 @@ function renderPrepBatches(batches) {
       <div class="prep-batch-slot">${slotIcon(b.slot)} ${b.slot}</div>
       <div class="prep-batch-name">${b.name}</div>
       <div class="prep-batch-servings">🧺 Makes ${b.occurrences} serving${b.occurrences === 1 ? "" : "s"} · ${money(b.cost)}</div>
-      <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("")}</ul>
+      <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
       <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
     </div>`).join("");
 }
@@ -1061,7 +1061,7 @@ function renderPrintPrepGuide(result) {
       <div class="booklet-meal-body">
         <div>
           <strong>Total ingredients</strong>
-          <ul>${b.items.map(i => `<li>${FOODS[i.food].name} — ${grams(i.grams)}</li>`).join("")}</ul>
+          <ul>${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
         </div>
         <div>
           <strong>Instructions</strong>

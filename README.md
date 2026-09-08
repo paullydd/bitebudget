@@ -18,7 +18,7 @@ that runs in any modern browser.
   and everything else (shuffling, swapping a meal, editing prices) leaves
   you exactly where you were instead of jumping you around.
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 91 built-in recipe templates
+  day for a plan of 1–14 days, rotating through 99 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3
   templates for every meal style (bowl, wrap/sandwich, stir-fry, soup, salad,
   smoothie) at both lunch and dinner, plus high-protein snacks (protein

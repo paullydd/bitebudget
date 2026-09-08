@@ -62,6 +62,15 @@ const MEAL_TEMPLATES = [
   { id: "b19", slot: "breakfast", style: "smoothie", name: "Chia Berry Protein Smoothie", prepTime: 5, cookTime: 0,
     items: [{ food: "chia_seeds", grams: 12 }, { food: "banana", grams: 59 }, { food: "greek_yogurt", grams: 122 }, { food: "almond_milk", grams: 240 }, { food: "blueberries", grams: 148 }],
     instructions: ["Combine the chia seeds, banana, Greek yogurt, almond milk, and berries in a blender.", "Blend on high until smooth, about 30-45 seconds.", "Let sit for 2 minutes so the chia seeds soften slightly, then blend once more.", "Pour into a glass and serve chilled."] },
+  { id: "b20", slot: "breakfast", style: "eggs", name: "Ham & Cheese English Muffin", prepTime: 5, cookTime: 6,
+    items: [{ food: "english_muffin", grams: 57 }, { food: "deli_ham", grams: 57 }, { food: "egg", grams: 50 }, { food: "cheddar_cheese", grams: 20 }],
+    instructions: ["Split and toast the English muffin.", "Fry or scramble the egg to your liking.", "Warm the ham in the same pan for a minute.", "Layer the ham, egg, and cheddar on the muffin and close it up."] },
+  { id: "b21", slot: "breakfast", style: "eggs", name: "Turkey Bacon & Egg Sandwich", prepTime: 5, cookTime: 8,
+    items: [{ food: "turkey_bacon", grams: 24 }, { food: "egg", grams: 50 }, { food: "english_muffin", grams: 57 }],
+    instructions: ["Cook the turkey bacon in a skillet over medium heat until crisp, 4-5 minutes, then set aside.", "Fry the egg in the same pan.", "Split and toast the English muffin.", "Stack the bacon and egg on the muffin."] },
+  { id: "b22", slot: "breakfast", style: "eggs", name: "Pork Roll, Egg & Cheese", prepTime: 5, cookTime: 8,
+    items: [{ food: "pork_roll", grams: 42 }, { food: "egg", grams: 50 }, { food: "cheddar_cheese", grams: 20 }, { food: "english_muffin", grams: 57 }],
+    instructions: ["Score the edges of the pork roll slice so it doesn't cup, then fry over medium heat until browned on both sides, about 4 minutes.", "Fry the egg in the same pan.", "Split and toast the English muffin.", "Stack the pork roll, egg, and cheddar on the muffin."] },
 
   // ---------- LUNCH ----------
   { id: "l1", slot: "lunch", style: "bowl", name: "Chicken & Rice Bowl", prepTime: 5, cookTime: 15,
@@ -136,6 +145,15 @@ const MEAL_TEMPLATES = [
   { id: "l24", slot: "lunch", style: "bowl", name: "Chicken Pasta with Cherry Tomatoes & Red Onion", prepTime: 8, cookTime: 12,
     items: [{ food: "chicken_breast", grams: 85 }, { food: "pasta", grams: 140 }, { food: "cherry_tomatoes", grams: 74.5 }, { food: "onion", grams: 40 }, { food: "olive_oil", grams: 7 }],
     instructions: ["Cook the pasta according to package directions; drain.", "Season and sear the chicken until cooked through, about 5-6 minutes; slice.", "Halve the cherry tomatoes and thinly slice the red onion.", "Toss everything together with a light drizzle of olive oil and a squeeze of lime or lemon."] },
+  { id: "l25", slot: "lunch", style: "wrap_sandwich", name: "Ham & Mayo Lavash Wrap", prepTime: 6, cookTime: 0,
+    items: [{ food: "deli_ham", grams: 85 }, { food: "mayo", grams: 14 }, { food: "lavash_bread", grams: 85 }, { food: "lettuce", grams: 35 }, { food: "cucumber", grams: 60 }],
+    instructions: ["Lay the lavash flat and spread the mayo evenly over it.", "Layer the ham, lettuce, and sliced cucumber down the center.", "Roll up tightly and slice in half."] },
+  { id: "l26", slot: "lunch", style: "bowl", name: "Protein Pasta Primavera", prepTime: 8, cookTime: 12,
+    items: [{ food: "protein_pasta", grams: 140 }, { food: "chicken_breast", grams: 113.4 }, { food: "broccoli", grams: 91 }, { food: "bell_pepper", grams: 59.5 }, { food: "olive_oil", grams: 7 }],
+    instructions: ["Cook the protein pasta according to package directions; drain.", "Season and sear the chicken until cooked through, about 6-7 minutes; slice.", "Steam the broccoli and bell pepper until tender-crisp, about 5 minutes.", "Toss everything together with a light drizzle of olive oil."] },
+  { id: "l27", slot: "lunch", style: "wrap_sandwich", name: "Turkey Bacon Club Lavash Wrap", prepTime: 8, cookTime: 6,
+    items: [{ food: "turkey_bacon", grams: 24 }, { food: "turkey_breast", grams: 57 }, { food: "mayo", grams: 14 }, { food: "lavash_bread", grams: 85 }, { food: "lettuce", grams: 35 }, { food: "cherry_tomatoes", grams: 50 }],
+    instructions: ["Cook the turkey bacon in a skillet until crisp, about 4-5 minutes; let cool slightly.", "Lay the lavash flat and spread the mayo evenly over it.", "Layer the turkey breast, turkey bacon, lettuce, and halved cherry tomatoes down the center.", "Roll up tightly and slice in half."] },
 
   // ---------- DINNER ----------
   { id: "d1", slot: "dinner", style: "bowl", name: "Baked Salmon with Sweet Potato", prepTime: 8, cookTime: 25,
@@ -219,6 +237,12 @@ const MEAL_TEMPLATES = [
   { id: "d27", slot: "dinner", style: "bowl", name: "Honey BBQ Chicken Mac & Cheese", prepTime: 8, cookTime: 18,
     items: [{ food: "chicken_breast", grams: 113.4 }, { food: "pasta", grams: 140 }, { food: "bbq_sauce", grams: 34 }, { food: "honey", grams: 10.5 }, { food: "mexican_cheese_blend", grams: 28.35 }, { food: "cream_cheese", grams: 15 }],
     instructions: ["Cook the pasta according to package directions; drain, reserving a splash of pasta water.", "Sear the diced chicken until cooked through, about 6-7 minutes, then toss with the BBQ sauce and honey until glazed.", "Off heat, stir the cream cheese and shredded cheese into the hot pasta (with a splash of pasta water) until melted and creamy.", "Fold in the BBQ chicken."] },
+  { id: "d28", slot: "dinner", style: "bowl", name: "Sweet Corn & Black Bean Chicken Bowl", prepTime: 8, cookTime: 15,
+    items: [{ food: "chicken_breast", grams: 141.75 }, { food: "sweet_corn", grams: 150 }, { food: "black_beans", grams: 129 }, { food: "salsa", grams: 34 }],
+    instructions: ["Season the chicken with taco seasoning and sear until cooked through, about 6-7 minutes; slice.", "Cut the corn kernels off the cob (or use thawed frozen corn) and warm in a dry skillet until lightly charred, about 4 minutes.", "Warm the black beans.", "Assemble the bowl with chicken, corn, and black beans, topped with salsa."] },
+  { id: "d29", slot: "dinner", style: "bowl", name: "Protein Pasta with Turkey & Broccoli", prepTime: 8, cookTime: 15,
+    items: [{ food: "protein_pasta", grams: 140 }, { food: "ground_turkey", grams: 113.4 }, { food: "broccoli", grams: 91 }, { food: "olive_oil", grams: 7 }],
+    instructions: ["Cook the protein pasta according to package directions; drain.", "Brown the ground turkey in a skillet over medium heat, breaking it up, about 6-7 minutes.", "Steam the broccoli until tender-crisp, about 5 minutes.", "Toss the pasta, turkey, and broccoli together with a light drizzle of olive oil."] },
 
   // ---------- SNACK ----------
   { id: "s1", slot: "snack", prepTime: 2, cookTime: 0, name: "Apple & Almonds",

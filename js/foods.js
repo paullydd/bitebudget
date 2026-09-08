@@ -85,6 +85,14 @@ const FOODS = {
   flour:           { name: "All-Purpose Flour",   protein: 10,   carbs: 76,   fat: 1,    price: 0.15, veg: true, category: "Pantry & Grains" },
   cherry_tomatoes: { name: "Cherry Tomatoes",     protein: 0.9,  carbs: 3.9,  fat: 0.2,  price: 0.60, veg: true, category: "Produce" },
   chia_seeds:      { name: "Chia Seeds",          protein: 17,   carbs: 42,   fat: 31,   price: 1.50, veg: true, category: "Pantry & Grains" },
+  deli_ham:        { name: "Deli Sliced Ham",     protein: 18,   carbs: 2,    fat: 4,    price: 1.25, veg: false, category: "Protein", proteinFamily: "red_meat" },
+  turkey_bacon:    { name: "Turkey Bacon",        protein: 30,   carbs: 2,    fat: 15,   price: 1.03, veg: false, category: "Protein", proteinFamily: "poultry" },
+  english_muffin:  { name: "English Muffin",      protein: 8,    carbs: 46,   fat: 2,    price: 0.47, veg: true, category: "Pantry & Grains" },
+  sweet_corn:      { name: "Sweet Corn",          protein: 3.4,  carbs: 19,   fat: 1.5,  price: 0.40, veg: true, category: "Produce" },
+  pork_roll:       { name: "Pork Roll",           protein: 14,   carbs: 2,    fat: 18,   price: 2.42, veg: false, category: "Protein", proteinFamily: "red_meat" },
+  mayo:            { name: "Mayonnaise",          protein: 1,    carbs: 1,    fat: 75,   price: 0.52, veg: true, category: "Pantry & Grains" },
+  lavash_bread:    { name: "Lavash Bread",        protein: 10,   carbs: 55,   fat: 2,    price: 0.88, veg: true, category: "Pantry & Grains" },
+  protein_pasta:   { name: "Protein Pasta (cooked)", protein: 20, carbs: 45,  fat: 2.5,  price: 0.64, veg: true, category: "Pantry & Grains" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.
@@ -191,6 +199,14 @@ const SERVING_UNITS = {
   flour:            { unit: "tbsp", grams: 8,  noPlural: true },
   cherry_tomatoes:  { unit: "cup",  grams: 149 },
   chia_seeds:       { unit: "tbsp", grams: 12, noPlural: true },
+  deli_ham:         { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
+  turkey_bacon:     { unit: "slice", grams: 8, round: 0.5 },
+  english_muffin:   { unit: "muffin", grams: 57, round: 0.5 },
+  sweet_corn:       { unit: "ear", grams: 150, round: 0.5 },
+  pork_roll:        { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
+  mayo:             { unit: "tbsp", grams: 14, noPlural: true },
+  lavash_bread:     { unit: "sheet", grams: 85, round: 0.5 },
+  protein_pasta:    { unit: "cup", grams: 140 },
 };
 
 // Renders a fraction as a whole number plus a unicode glyph (1¼, ½, 2¾, ...)

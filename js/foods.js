@@ -240,34 +240,52 @@ function formatServing(food, grams) {
   return `${formatQty(rounded)} ${unit}`;
 }
 
-// Converts a food + total gram amount (summed across a whole week) into a
-// quantity you can actually put in a cart — always rounds UP, since you
-// can't buy a fraction of a physical item, unlike formatServing (which
-// rounds to the nearest fraction for reading a single recipe). Eggs are
-// special-cased to whole dozens since they aren't sold individually; meat
-// and cheese convert to pounds above 16oz; everything else with a
+// Rounds a food + total gram amount (summed across a whole week) up to a
+// real purchasable quantity — you can't buy a fraction of a physical
+// item, unlike formatServing (which rounds to the nearest fraction for
+// reading a single recipe). Eggs are special-cased to whole dozens since
+// they aren't sold individually; meat and cheese convert to pounds above
+// 16oz (rounded again to the nearest quarter-pound — a real display
+// nicety, but it means the final "purchase size" can be a bit more than
+// the whole-oz amount underneath it); everything else with a
 // SERVING_UNITS entry ceils to a whole count. Falls back to grams for
-// anything not in SERVING_UNITS, same as formatServing.
-function formatShoppingQty(food, grams) {
-  if (grams <= 0) return "0g";
+// anything not in SERVING_UNITS, same as formatServing. Returns both the
+// label (what formatShoppingQty shows) and the gram figure that label
+// actually represents (what shoppingPurchaseGrams needs for estimating
+// pantry leftovers) so the two can never disagree with each other.
+function roundUpToPurchase(food, grams) {
+  if (grams <= 0) return { grams: 0, label: "0g" };
   if (food === "egg") {
     const eggs = grams / SERVING_UNITS.egg.grams;
     const dozens = Math.ceil(eggs / 12);
-    return dozens <= 0 ? "0g" : `${dozens} dozen eggs`;
+    if (dozens <= 0) return { grams: 0, label: "0g" };
+    return { grams: dozens * 12 * SERVING_UNITS.egg.grams, label: `${dozens} dozen eggs` };
   }
   const su = SERVING_UNITS[food];
-  if (!su) return `${Math.round(grams)}g`;
+  if (!su) return { grams, label: `${Math.round(grams)}g` };
   const qty = grams / su.grams;
   if (su.unit === "oz") {
     const oz = Math.ceil(qty);
     if (oz >= 16) {
       const lb = Math.ceil((oz / 16) * 4) / 4;
-      return `${formatQty(lb)} lb`;
+      return { grams: lb * 16 * su.grams, label: `${formatQty(lb)} lb` };
     }
-    return `${oz} oz`;
+    return { grams: oz * su.grams, label: `${oz} oz` };
   }
   const ceilQty = Math.ceil(qty);
-  if (ceilQty <= 0) return "0g";
+  if (ceilQty <= 0) return { grams: 0, label: "0g" };
   const unit = ceilQty > 1 && !su.noPlural ? (su.plural || `${su.unit}s`) : su.unit;
-  return `${ceilQty} ${unit}`;
+  return { grams: ceilQty * su.grams, label: `${formatQty(ceilQty)} ${unit}` };
+}
+
+function formatShoppingQty(food, grams) {
+  return roundUpToPurchase(food, grams).label;
+}
+
+// The gram figure behind formatShoppingQty's rounded-up label — how much
+// you're actually carrying home once you buy in real purchasable units.
+// Used by estimateLeftoverSurplus (js/planner.js) to guess what's likely
+// left over after shopping.
+function shoppingPurchaseGrams(food, grams) {
+  return roundUpToPurchase(food, grams).grams;
 }

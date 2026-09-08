@@ -63,6 +63,19 @@ that runs in any modern browser.
   one list, in quantities you can actually buy ("1 dozen eggs", "1½ lb
   chicken breast", "2 cups rice") instead of raw grams, plus a total
   estimated cost.
+- **Pantry (leftover carry-over)** — a "🥫 Pantry" button on the shopping
+  list opens what you've already got on hand, and every future shopping
+  list subtracts it from what it tells you to buy (cost included — an
+  item fully covered shows "✓ Have enough" instead of a quantity). The
+  suggestions come for free from data the app already has: buying a
+  purchasable quantity ("a dozen eggs") almost always overshoots what a
+  week's recipes actually use, and that rounding gap is a real estimate
+  of what's likely left in the fridge after shopping — capped to the 8
+  most worth remembering so it stays a short, actionable list instead of
+  a wall of 50-cent odds and ends. Nothing is added without you clicking
+  "+ Add," and nothing in the pantry is ever removed automatically either
+  — regenerating, shuffling, or swapping a meal never touches it, only
+  you do, once you've actually used something up.
 - **Vegetarian filter** and a "shuffle" button to regenerate with more
   variety without changing your settings.
 - **Adjustable text size** — A−/A+ controls in the header scale the whole

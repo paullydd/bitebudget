@@ -212,8 +212,15 @@ function recomputeDayTotals(day) {
 
 // Aggregates every ingredient across a plan into a shopping list with a
 // total cost estimate — used both by initial plan generation and after a
-// single-meal swap, so the two never drift.
-function buildShoppingList(plan) {
+// single-meal swap, so the two never drift. `pantry` ({food: grams}, see
+// js/app.js's loadPantry) discounts whatever's already on hand from what
+// still needs to be bought — `grams` keeps its existing meaning ("still
+// need to buy") for every current reader, cost drops to match, and
+// `fromPantry` is new (how much of this food's weekly need the pantry is
+// covering). An item can end up with `grams: 0` if the pantry fully
+// covers it — still included, not filtered out, so the UI can show
+// "already have enough" instead of it silently disappearing.
+function buildShoppingList(plan, pantry = {}) {
   const shoppingMap = {};
   for (const day of plan) {
     for (const meal of day.meals) {
@@ -222,9 +229,36 @@ function buildShoppingList(plan) {
       }
     }
   }
-  return Object.entries(shoppingMap).map(([food, grams]) => ({
-    food, name: FOODS[food].name, grams, cost: (FOODS[food].price * grams) / 100,
-  })).sort((a, b) => b.cost - a.cost);
+  return Object.entries(shoppingMap).map(([food, neededGrams]) => {
+    const fromPantry = Math.min(neededGrams, Math.max(0, pantry[food] || 0));
+    const grams = neededGrams - fromPantry;
+    return { food, name: FOODS[food].name, grams, fromPantry, cost: (FOODS[food].price * grams) / 100 };
+  }).sort((a, b) => b.cost - a.cost);
+}
+
+// The gap between a real purchasable quantity (see shoppingPurchaseGrams
+// in js/foods.js) and what's actually needed this trip — e.g. told to
+// buy a dozen eggs when the week's recipes only use 10, that's 2 eggs'
+// worth likely left over. A first-pass suggestion for the Pantry dialog,
+// not a source of truth — the user confirms before anything is added.
+// Based on `grams` (post-pantry-discount, what's actually being bought),
+// not the raw weekly need, so it compounds correctly with pantry stock
+// already in hand instead of over-suggesting.
+// Only surfaces a surplus once it's at least 40% of that food's own
+// purchase unit — a gram or two of rounding noise on nearly every
+// ingredient isn't a "leftover" anyone would notice, and a suggestion
+// list nobody can act on defeats the point. Foods with no SERVING_UNITS
+// entry never round up to begin with, so there's nothing to suggest.
+function estimateLeftoverSurplus(shoppingList) {
+  const surplus = {};
+  shoppingList.forEach(item => {
+    if (item.grams <= 0) return;
+    const su = SERVING_UNITS[item.food];
+    if (!su) return;
+    const extra = shoppingPurchaseGrams(item.food, item.grams) - item.grams;
+    if (extra >= su.grams * 0.4) surplus[item.food] = Math.round(extra);
+  });
+  return surplus;
 }
 
 // Styles that don't hold up as a cook-once-eat-all-week batch — a wrap or
@@ -300,7 +334,7 @@ function groupIntoPrepBatches(plan) {
 // one recipe per named slot for that many occurrences — "prep lunch 4
 // times" cooks one lunch recipe once and reuses it for the first 4 days;
 // the remaining days (and any slot left at 0) pick fresh as usual.
-function generatePlan(settings, preferences) {
+function generatePlan(settings, preferences, pantry = {}) {
   const {
     days, dailyCalories, macroSplit, budgetPeriod, budgetAmount,
     snacksPerDay, vegetarianOnly, mealPrep,
@@ -369,7 +403,7 @@ function generatePlan(settings, preferences) {
     plan.push(day);
   }
 
-  const shoppingList = buildShoppingList(plan);
+  const shoppingList = buildShoppingList(plan, pantry);
   const totalCost = shoppingList.reduce((s, i) => s + i.cost, 0);
   const totalBudget = dailyBudget * days;
 
@@ -388,7 +422,7 @@ function generatePlan(settings, preferences) {
 // place). Reuses the same per-slot target-calorie math and pickTemplate()
 // used during initial generation, so preference weighting, dislikes, and
 // budget-awareness all apply identically to a manual swap.
-function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
+function regenerateMeal(result, dayIndex, mealIndex, settings, preferences, pantry = {}) {
   const { dailyCalories, macroSplit, snacksPerDay, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
@@ -424,7 +458,7 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   };
   recomputeDayTotals(day);
 
-  result.shoppingList = buildShoppingList(result.plan);
+  result.shoppingList = buildShoppingList(result.plan, pantry);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
   return result;
 }
@@ -434,7 +468,7 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
 // slot. All occurrences share one target calorie (a slot's target is the
 // same every day) so the new pick is scaled once and reused everywhere,
 // exactly like the initial batch pick in generatePlan.
-function regeneratePrepBatch(result, batchId, settings, preferences) {
+function regeneratePrepBatch(result, batchId, settings, preferences, pantry = {}) {
   const { dailyCalories, macroSplit, vegetarianOnly } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
@@ -471,7 +505,7 @@ function regeneratePrepBatch(result, batchId, settings, preferences) {
     recomputeDayTotals(day);
   });
 
-  result.shoppingList = buildShoppingList(result.plan);
+  result.shoppingList = buildShoppingList(result.plan, pantry);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
   return result;
 }
@@ -480,7 +514,7 @@ function regeneratePrepBatch(result, batchId, settings, preferences) {
 // items — used after a price edit so displayed costs refresh immediately
 // without re-picking any meals. Custom/logged meals are skipped since
 // their nutrition is user-entered, not derived from FOODS prices.
-function recomputeAllCosts(result) {
+function recomputeAllCosts(result, pantry = {}) {
   result.plan.forEach(day => {
     day.meals.forEach(m => {
       if (m.custom) return;
@@ -490,7 +524,7 @@ function recomputeAllCosts(result) {
     });
     recomputeDayTotals(day);
   });
-  result.shoppingList = buildShoppingList(result.plan);
+  result.shoppingList = buildShoppingList(result.plan, pantry);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
   return result;
 }
@@ -501,7 +535,7 @@ function recomputeAllCosts(result) {
 // auto-picked slot in that day is re-picked so the day's calorie total
 // still aims for the same target around the fixed meal — custom/pending
 // meals elsewhere in the day are left untouched either way.
-function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, preferences, rebalance) {
+function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, preferences, rebalance, pantry = {}) {
   const { dailyCalories, macroSplit, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
@@ -545,7 +579,7 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
   }
 
   recomputeDayTotals(day);
-  result.shoppingList = buildShoppingList(result.plan);
+  result.shoppingList = buildShoppingList(result.plan, pantry);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
   return result;
 }

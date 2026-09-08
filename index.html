@@ -388,6 +388,7 @@
     <section id="resultsShopping" class="panel hidden">
       <div class="shopping-head">
         <h2>Weekly Shopping List</h2>
+        <button type="button" id="pantryBtn" class="secondary-btn">🥫 Pantry</button>
         <button type="button" id="printListBtn" class="secondary-btn">🖨️ Print Shopping List</button>
       </div>
       <div id="shoppingList"></div>
@@ -489,6 +490,17 @@
       <h2>📊 Spending History</h2>
       <div id="historySummary" class="history-summary"></div>
       <div id="historyList" class="history-list"></div>
+    </div>
+  </dialog>
+
+  <dialog id="pantryDialog" class="achievements-dialog">
+    <div class="achievements-page">
+      <button type="button" id="pantryCloseBtn" class="recipe-close" aria-label="Close pantry">✕</button>
+      <h2>🥫 Pantry</h2>
+      <p class="wizard-hint">What you've already got on hand — the shopping list subtracts this from what it tells you to buy. Nothing here changes on its own; add or remove items as you actually use them up.</p>
+      <div id="pantrySuggested"></div>
+      <div id="pantryItems" class="pantry-list"></div>
+      <button type="button" id="pantryClearBtn" class="text-link-btn">Clear pantry</button>
     </div>
   </dialog>
 

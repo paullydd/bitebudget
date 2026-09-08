@@ -8,6 +8,7 @@ const SHOPPING_CHECKED_KEY = "biteBudget.shoppingChecked.v1";
 const THEME_KEY = "biteBudget.theme.v1";
 const FAVORITES_KEY = "biteBudget.favorites.v1";
 const DISLIKED_RECIPES_KEY = "biteBudget.dislikedRecipes.v1";
+const PANTRY_KEY = "biteBudget.pantry.v1";
 const HISTORY_KEY = "biteBudget.history.v1";
 const MY_MEALS_KEY = "biteBudget.myMeals.v1";
 const PRICE_OVERRIDES_KEY = "biteBudget.priceOverrides.v1";
@@ -588,6 +589,20 @@ function loadPreferences() {
   return { ...(prefs || {}), favoriteIds, dislikedRecipeIds };
 }
 
+// {food: grams} of what's already on hand — see the Pantry dialog. Never
+// written by generating/shuffling/swapping a plan, only by the dialog
+// itself (adding a suggestion, a manual edit, a removal, or Clear): the
+// shopping list always discounts whatever's *currently* here, however
+// long it's been there, until the user says otherwise.
+function loadPantry() {
+  const saved = localStorage.getItem(PANTRY_KEY);
+  return saved ? JSON.parse(saved) : {};
+}
+
+function savePantry(pantry) {
+  localStorage.setItem(PANTRY_KEY, JSON.stringify(pantry));
+}
+
 function loadHistory() {
   const saved = localStorage.getItem(HISTORY_KEY);
   return saved ? JSON.parse(saved) : [];
@@ -1104,15 +1119,20 @@ function renderShoppingList(shoppingList, totalCost, totalBudget) {
 
   const sections = SHOPPING_CATEGORY_ORDER.filter(cat => groups[cat]).map(cat => {
     const items = [...groups[cat]].sort((a, b) => a.name.localeCompare(b.name));
-    const rows = items.map(i => `
-      <li class="shopping-item ${checked.has(i.food) ? "checked" : ""}">
+    const rows = items.map(i => {
+      const haveEnough = i.grams <= 0 && i.fromPantry > 0;
+      const qtyDisplay = haveEnough ? `<span class="shopping-item-have">✓ Have enough</span>` : formatShoppingQty(i.food, i.grams);
+      const pantryNote = i.fromPantry > 0 && !haveEnough ? `<span class="shopping-item-pantry-note">🥫 using ${formatServing(i.food, i.fromPantry)} from pantry</span>` : "";
+      return `
+      <li class="shopping-item ${checked.has(i.food) ? "checked" : ""} ${haveEnough ? "have-enough" : ""}">
         <label>
           <input type="checkbox" class="shopping-check" data-food="${i.food}" ${checked.has(i.food) ? "checked" : ""}>
-          <span class="shopping-item-name">${i.name}</span>
-          <span class="shopping-item-qty">${formatShoppingQty(i.food, i.grams)}</span>
+          <span class="shopping-item-name">${i.name}${pantryNote}</span>
+          <span class="shopping-item-qty">${qtyDisplay}</span>
           <span class="shopping-item-cost">${money(i.cost)}</span>
         </label>
-      </li>`).join("");
+      </li>`;
+    }).join("");
     return `
       <div class="shopping-group">
         <h4>${cat}</h4>
@@ -1127,6 +1147,63 @@ function renderShoppingList(shoppingList, totalCost, totalBudget) {
       <strong>Total</strong>
       <span>${money(totalCost)} / ${money(totalBudget)}</span>
     </div>`;
+}
+
+// Suggestions not yet in the pantry — foods already added don't need to
+// be suggested again (re-suggesting something the user already confirmed
+// would just be noise). Purely a read; nothing here touches storage.
+// A real week's shopping list can have a meaningful rounding surplus on
+// a couple dozen different foods at once — technically real, but a list
+// that long isn't something anyone will actually read. Caps to the 8
+// worth the most (surplus grams × price), so what's shown is the stuff
+// actually worth remembering, not a wall of 50-cent odds and ends.
+function pendingPantrySuggestions() {
+  if (!currentPlanResult) return {};
+  const pantry = loadPantry();
+  const surplus = estimateLeftoverSurplus(currentPlanResult.shoppingList);
+  const entries = Object.entries(surplus)
+    .filter(([food]) => !(food in pantry))
+    .sort(([foodA, gramsA], [foodB, gramsB]) => (FOODS[foodB].price * gramsB) - (FOODS[foodA].price * gramsA))
+    .slice(0, 8);
+  return Object.fromEntries(entries);
+}
+
+// Shows a live count on the Pantry button so an unreviewed suggestion is
+// actually discoverable instead of sitting silently behind a dialog
+// nobody thinks to open.
+function updatePantryButtonBadge() {
+  const btn = $("#pantryBtn");
+  if (!btn) return;
+  const count = Object.keys(pendingPantrySuggestions()).length;
+  btn.textContent = count > 0 ? `🥫 Pantry (${count})` : "🥫 Pantry";
+}
+
+function renderPantryDialog() {
+  const pantry = loadPantry();
+  const pending = pendingPantrySuggestions();
+
+  const suggestedEntries = Object.entries(pending);
+  $("#pantrySuggested").innerHTML = suggestedEntries.length ? `
+    <p class="pantry-section-label">Might be left over from this week's shopping</p>
+    <div class="pantry-suggested-list">
+      ${suggestedEntries.map(([food, grams]) => `
+        <div class="pantry-suggested-row">
+          <span>${FOODS[food].name} — ${formatServing(food, grams)}</span>
+          <button type="button" class="pantry-add-btn" data-food="${food}" data-grams="${grams}">+ Add</button>
+        </div>`).join("")}
+    </div>` : "";
+
+  const pantryEntries = Object.entries(pantry);
+  $("#pantryItems").innerHTML = pantryEntries.length ? `
+    <p class="pantry-section-label">Your pantry</p>
+    ${pantryEntries.map(([food, grams]) => `
+      <div class="pantry-row">
+        <span class="pantry-row-name">${FOODS[food].name}</span>
+        <span class="pantry-row-hint">${formatServing(food, grams)}</span>
+        <input type="number" class="pantry-row-input" data-food="${food}" value="${Math.round(grams)}" min="0" aria-label="${FOODS[food].name} on hand, in grams"> g
+        <button type="button" class="pantry-remove-btn" data-food="${food}" aria-label="Remove ${FOODS[food].name} from pantry">✕</button>
+      </div>`).join("")}
+  ` : `<p class="pantry-empty">Nothing in your pantry yet.</p>`;
 }
 
 // Builds the full printable meal-plan booklet: every day, every meal, full
@@ -1322,6 +1399,7 @@ function renderPlan(result) {
   recordRecipesTried(plan);
   renderProgressStrip();
   renderPlanNudge();
+  updatePantryButtonBadge();
 }
 
 // Compact stats strip shown once there's any history — hidden for a
@@ -1481,7 +1559,7 @@ function init() {
   });
 
   const savedPlan = localStorage.getItem(PLAN_KEY);
-  if (savedPlan) renderPlan(recomputeAllCosts(JSON.parse(savedPlan)));
+  if (savedPlan) renderPlan(recomputeAllCosts(JSON.parse(savedPlan), loadPantry()));
   else renderProgressStrip();
   activeSection = savedPlan ? "week" : "settings";
   showSection(activeSection);
@@ -1496,7 +1574,7 @@ function init() {
     e.preventDefault();
     const settings = readSettings();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    const result = generatePlan(settings, loadPreferences());
+    const result = generatePlan(settings, loadPreferences(), loadPantry());
     localStorage.removeItem(SHOPPING_CHECKED_KEY);
     activeDayNum = 1;
     recordNewHistoryEntry(result.summary);
@@ -1507,7 +1585,7 @@ function init() {
 
   $("#regenerateBtn").addEventListener("click", () => {
     const settings = readSettings();
-    const result = generatePlan(settings, loadPreferences());
+    const result = generatePlan(settings, loadPreferences(), loadPantry());
     localStorage.removeItem(SHOPPING_CHECKED_KEY);
     activeDayNum = 1;
     updateLatestHistoryEntry(result.summary);
@@ -1533,7 +1611,7 @@ function init() {
     if (swapBtn) {
       const dayIndex = Number(swapBtn.dataset.dayIndex);
       const mealIndex = Number(swapBtn.dataset.mealIndex);
-      regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences());
+      regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences(), loadPantry());
       updateLatestHistoryEntry(currentPlanResult.summary);
       localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
       renderPlan(currentPlanResult);
@@ -1570,7 +1648,7 @@ function init() {
     if (!currentPlanResult) return;
     const shuffleBtn = e.target.closest(".prep-batch-shuffle-btn");
     if (!shuffleBtn) return;
-    regeneratePrepBatch(currentPlanResult, shuffleBtn.dataset.batchId, readSettings(), loadPreferences());
+    regeneratePrepBatch(currentPlanResult, shuffleBtn.dataset.batchId, readSettings(), loadPreferences(), loadPantry());
     updateLatestHistoryEntry(currentPlanResult.summary);
     localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
     renderPlan(currentPlanResult);
@@ -1647,7 +1725,7 @@ function init() {
     }
 
     const rebalance = !wasCustom && !leaveOpen;
-    applyCustomMeal(currentPlanResult, dayIndex, mealIndex, customMeal, readSettings(), loadPreferences(), rebalance);
+    applyCustomMeal(currentPlanResult, dayIndex, mealIndex, customMeal, readSettings(), loadPreferences(), rebalance, loadPantry());
     updateLatestHistoryEntry(currentPlanResult.summary);
     localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
     renderPlan(currentPlanResult);
@@ -1668,6 +1746,52 @@ function init() {
     if (e.target === $("#historyDialog")) $("#historyDialog").close();
   });
 
+  $("#pantryBtn").addEventListener("click", () => {
+    renderPantryDialog();
+    $("#pantryDialog").showModal();
+  });
+  $("#pantryCloseBtn").addEventListener("click", () => $("#pantryDialog").close());
+  $("#pantryDialog").addEventListener("click", (e) => {
+    if (e.target === $("#pantryDialog")) { $("#pantryDialog").close(); return; }
+
+    const addBtn = e.target.closest(".pantry-add-btn");
+    if (addBtn) {
+      const pantry = loadPantry();
+      pantry[addBtn.dataset.food] = (pantry[addBtn.dataset.food] || 0) + Number(addBtn.dataset.grams);
+      savePantry(pantry);
+      renderPantryDialog();
+      updatePantryButtonBadge();
+      return;
+    }
+
+    const removeBtn = e.target.closest(".pantry-remove-btn");
+    if (removeBtn) {
+      const pantry = loadPantry();
+      delete pantry[removeBtn.dataset.food];
+      savePantry(pantry);
+      renderPantryDialog();
+      updatePantryButtonBadge();
+      return;
+    }
+
+    if (e.target.closest("#pantryClearBtn")) {
+      if (!confirm("Clear your pantry? This removes everything you've added.")) return;
+      savePantry({});
+      renderPantryDialog();
+      updatePantryButtonBadge();
+    }
+  });
+  $("#pantryItems").addEventListener("change", (e) => {
+    const input = e.target.closest(".pantry-row-input");
+    if (!input) return;
+    const pantry = loadPantry();
+    const grams = Math.max(0, Number(input.value) || 0);
+    if (grams <= 0) delete pantry[input.dataset.food]; else pantry[input.dataset.food] = grams;
+    savePantry(pantry);
+    renderPantryDialog();
+    updatePantryButtonBadge();
+  });
+
   $("#planNudge").addEventListener("click", (e) => {
     if (e.target.closest("#planNudgeGoBtn")) {
       showSection("settings");
@@ -1686,7 +1810,7 @@ function init() {
   // now in effect — reused by both the Save and Reset paths below.
   function commitPriceChanges() {
     if (!currentPlanResult) return;
-    recomputeAllCosts(currentPlanResult);
+    recomputeAllCosts(currentPlanResult, loadPantry());
     updateLatestHistoryEntry(currentPlanResult.summary);
     localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
     renderPlan(currentPlanResult);

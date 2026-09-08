@@ -3,6 +3,15 @@ function scaleItems(items, factor) {
   return items.map(({ food, grams }) => ({ food, grams: Math.max(5, Math.round((grams * factor) / 5) * 5) }));
 }
 
+// How much to stretch/shrink a recipe from its own designed base size.
+// With calorie tracking off there's no target to hit, so every recipe just
+// uses its own portion as written — no clamped scaling.
+function computeFactor(base, targetCal, trackCalories) {
+  if (!trackCalories) return 1;
+  if (base.cal <= 0) return 1;
+  return Math.min(1.4, Math.max(0.7, targetCal / base.cal));
+}
+
 function dailyBudgetFor(period, amount) {
   if (period === "weekly") return amount / 7;
   if (period === "monthly") return amount / 30;
@@ -152,9 +161,11 @@ function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, 
 }
 
 // Realistic best-case daily cost: cheapest eligible template per slot, scaled
-// to that slot's target calories with the same bounds generatePlan() uses.
-// Used to warn upfront when a budget can't realistically be met.
-function estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly) {
+// to that slot's target calories with the same bounds generatePlan() uses
+// (or left at its own designed size when calorie tracking is off), times
+// however many people the plan is feeding. Used to warn upfront when a
+// budget can't realistically be met.
+function estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly, trackCalories = true, servings = 1) {
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
   const slots = ["breakfast", "lunch", "dinner", ...Array(snacksPerDay).fill("snack")];
@@ -169,11 +180,10 @@ function estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly) {
     let cheapest = Infinity;
     for (const t of pool) {
       const base = computeNutrition(t.items);
-      let factor = base.cal > 0 ? targetCal / base.cal : 1;
-      factor = Math.min(1.4, Math.max(0.7, factor));
+      const factor = computeFactor(base, targetCal, trackCalories);
       cheapest = Math.min(cheapest, base.cost * factor);
     }
-    total += cheapest === Infinity ? 0 : cheapest;
+    total += cheapest === Infinity ? 0 : cheapest * servings;
   }
   return total;
 }
@@ -236,7 +246,7 @@ function groupIntoPrepBatches(plan) {
     day.meals.forEach(m => {
       if (!m.prepped) return;
       if (!groups[m.id]) {
-        groups[m.id] = { id: m.id, name: m.name, slot: m.slot, instructions: m.instructions, occurrences: 0, itemTotals: {}, cost: 0 };
+        groups[m.id] = { id: m.id, name: m.name, slot: m.slot, instructions: m.instructions, occurrences: 0, itemTotals: {}, cost: 0, servings: m.servings || 1 };
       }
       const g = groups[m.id];
       g.occurrences++;
@@ -248,7 +258,7 @@ function groupIntoPrepBatches(plan) {
   });
   return Object.values(groups)
     .map(g => ({
-      id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, occurrences: g.occurrences, cost: g.cost,
+      id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, occurrences: g.occurrences, cost: g.cost, servings: g.servings,
       items: Object.entries(g.itemTotals).map(([food, grams]) => ({ food, grams })),
     }));
 }
@@ -264,6 +274,9 @@ function generatePlan(settings, preferences) {
     days, dailyCalories, macroSplit, budgetPeriod, budgetAmount,
     snacksPerDay, vegetarianOnly, mealPrep,
   } = settings;
+  const trackCalories = settings.trackCalories !== false;
+  const servings = settings.servings || 1;
+  const effectiveMacroSplit = trackCalories ? macroSplit : null;
 
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
@@ -274,7 +287,7 @@ function generatePlan(settings, preferences) {
   ["breakfast", "lunch", "dinner"].forEach(slot => {
     const count = Math.min(days, Math.max(0, (mealPrep && mealPrep[slot]) || 0));
     if (count > 0) {
-      const [template] = selectPrepPool(slot, 1, vegetarianOnly, preferences, macroSplit);
+      const [template] = selectPrepPool(slot, 1, vegetarianOnly, preferences, effectiveMacroSplit);
       prepRemaining[slot] = { template, remaining: count };
     }
   });
@@ -299,17 +312,19 @@ function generatePlan(settings, preferences) {
         prep.remaining--;
         prepped = true;
       } else {
-        template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, macroSplit);
+        template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, effectiveMacroSplit);
       }
 
       const base = computeNutrition(template.items);
-      let factor = base.cal > 0 ? targetCal / base.cal : 1;
-      factor = Math.min(1.4, Math.max(0.7, factor));
-      const items = scaleItems(template.items, factor);
-      const nutrition = computeNutrition(items);
+      const factor = computeFactor(base, targetCal, trackCalories);
+      const personItems = scaleItems(template.items, factor);
+      const personNutrition = computeNutrition(personItems);
+      const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
 
       dayMeals.push({
-        slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
+        slot, id: template.id, name: template.name, items, instructions: template.instructions,
+        nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
+        servings,
         prepTime: template.prepTime, cookTime: template.cookTime, prepped,
       });
 
@@ -331,6 +346,7 @@ function generatePlan(settings, preferences) {
     plan, shoppingList,
     summary: {
       totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly,
+      servings, trackCalories,
       mealPrep: mealPrep || { breakfast: 0, lunch: 0, dinner: 0 },
       mealPrepEnabled: Object.keys(prepRemaining).length > 0,
     },
@@ -343,6 +359,9 @@ function generatePlan(settings, preferences) {
 // budget-awareness all apply identically to a manual swap.
 function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   const { dailyCalories, macroSplit, snacksPerDay, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const trackCalories = settings.trackCalories !== false;
+  const servings = settings.servings || 1;
+  const effectiveMacroSplit = trackCalories ? macroSplit : null;
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
@@ -358,16 +377,18 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
   avoidIds.push(oldMeal.id);
 
   const overBudget = day.totals.cost > dailyBudget;
-  const template = pickTemplate(slot, avoidIds, vegetarianOnly, overBudget, preferences, macroSplit);
+  const template = pickTemplate(slot, avoidIds, vegetarianOnly, overBudget, preferences, effectiveMacroSplit);
 
   const base = computeNutrition(template.items);
-  let factor = base.cal > 0 ? targetCal / base.cal : 1;
-  factor = Math.min(1.4, Math.max(0.7, factor));
-  const items = scaleItems(template.items, factor);
-  const nutrition = computeNutrition(items);
+  const factor = computeFactor(base, targetCal, trackCalories);
+  const personItems = scaleItems(template.items, factor);
+  const personNutrition = computeNutrition(personItems);
+  const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
 
   day.meals[mealIndex] = {
-    slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
+    slot, id: template.id, name: template.name, items, instructions: template.instructions,
+    nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
+    servings,
     prepTime: template.prepTime, cookTime: template.cookTime,
   };
   recomputeDayTotals(day);
@@ -385,7 +406,9 @@ function recomputeAllCosts(result) {
   result.plan.forEach(day => {
     day.meals.forEach(m => {
       if (m.custom) return;
-      m.nutrition = computeNutrition(m.items);
+      const n = computeNutrition(m.items);
+      const servings = m.servings || 1;
+      m.nutrition = { protein: n.protein / servings, carbs: n.carbs / servings, fat: n.fat / servings, cal: n.cal / servings, cost: n.cost };
     });
     recomputeDayTotals(day);
   });
@@ -402,6 +425,9 @@ function recomputeAllCosts(result) {
 // meals elsewhere in the day are left untouched either way.
 function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, preferences, rebalance) {
   const { dailyCalories, macroSplit, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const trackCalories = settings.trackCalories !== false;
+  const servings = settings.servings || 1;
+  const effectiveMacroSplit = trackCalories ? macroSplit : null;
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, settings.snacksPerDay);
@@ -425,14 +451,16 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
       const avoidIds = nearbyDays.flatMap(d => d.meals.filter(mm => mm.slot === m.slot && !mm.custom).map(mm => mm.id));
       avoidIds.push(m.id);
 
-      const template = pickTemplate(m.slot, avoidIds, vegetarianOnly, overBudget, preferences, macroSplit);
+      const template = pickTemplate(m.slot, avoidIds, vegetarianOnly, overBudget, preferences, effectiveMacroSplit);
       const base = computeNutrition(template.items);
-      let factor = base.cal > 0 ? targetCal / base.cal : 1;
-      factor = Math.min(1.4, Math.max(0.7, factor));
-      const items = scaleItems(template.items, factor);
-      const nutrition = computeNutrition(items);
+      const factor = computeFactor(base, targetCal, trackCalories);
+      const personItems = scaleItems(template.items, factor);
+      const personNutrition = computeNutrition(personItems);
+      const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
       day.meals[i] = {
-        slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions, nutrition,
+        slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions,
+        nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
+        servings,
         prepTime: template.prepTime, cookTime: template.cookTime,
       };
     });

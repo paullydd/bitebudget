@@ -28,7 +28,7 @@ const BADGES = [
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const SLOT_ORDER = ["breakfast", "lunch", "dinner", "snack"];
 const PREP_STORAGE_NOTE = "Store in airtight containers in the fridge up to 4 days, or freeze up to 3 months. Reheat covered until steaming.";
-const WIZARD_TOTAL_STEPS = 6;
+const WIZARD_TOTAL_STEPS = 7;
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
 const BUDGET_SLIDER_RANGES = {
   daily: { min: 5, max: 150, step: 5 },
@@ -334,10 +334,16 @@ function prefillOnboarding(prefs) {
     }
   }
 
-  // Calorie/budget aren't part of PREFS_KEY — they live in Settings already,
-  // so seed the wizard's copies from whatever Settings currently holds.
+  // Calorie/budget/servings aren't part of PREFS_KEY — they live in
+  // Settings already, so seed the wizard's copies from whatever Settings
+  // currently holds.
+  $("#obServings").value = $("#servings").value;
+
   $("#obCalories").value = $("#calories").value;
   $("#obCaloriesSlider").value = $("#calories").value;
+  const trackCalories = $("#trackCalories").checked;
+  document.querySelector(`#obTrackCaloriesYesNo .bubble[data-value="${trackCalories ? "yes" : "no"}"]`)
+    ?.dispatchEvent(new Event("click", { bubbles: true }));
 
   const period = $("#budgetPeriod").value;
   const periodBtn = document.querySelector(`#obBudgetPeriod .bubble[data-value="${period}"]`);
@@ -403,6 +409,11 @@ function collectPreferences() {
 // Settings fields (and their sliders), matching Settings' own lazy-persist
 // convention — nothing is written to STORAGE_KEY until Generate Plan runs.
 function syncOnboardingIntoSettings() {
+  $("#servings").value = $("#obServings").value;
+
+  const trackCalories = document.querySelector("#obTrackCaloriesYesNo .bubble.selected")?.dataset.value === "yes";
+  $("#trackCalories").checked = trackCalories;
+  toggleCalorieFields(trackCalories);
   $("#calories").value = $("#obCalories").value;
   $("#caloriesSlider").value = $("#obCalories").value;
 
@@ -573,6 +584,12 @@ function initOnboarding() {
     if (btn) $("#obMealPrepDetails").classList.toggle("hidden", btn.dataset.value !== "yes");
   });
 
+  wireBubbleGroup($("#obTrackCaloriesYesNo"), "single");
+  $("#obTrackCaloriesYesNo").addEventListener("click", (e) => {
+    const btn = e.target.closest(".bubble");
+    if (btn) $("#obCaloriesDetails").classList.toggle("hidden", btn.dataset.value !== "yes");
+  });
+
   // Establishes correct aria-pressed/aria-label for whatever's selected by
   // default in the static HTML (e.g. "No, keep it varied") before any
   // click or prefill has run.
@@ -626,6 +643,8 @@ function readSettings() {
     budgetAmount: Number($("#budgetAmount").value),
     snacksPerDay: Number($("#snacks").value),
     vegetarianOnly: $("#vegetarian").checked,
+    servings: Number($("#servings").value) || 1,
+    trackCalories: $("#trackCalories").checked,
     mealPrep: {
       breakfast: Number($("#prepBreakfast").value),
       lunch: Number($("#prepLunch").value),
@@ -644,6 +663,9 @@ function writeSettingsToForm(s) {
   $("#budgetAmount").value = s.budgetAmount;
   $("#snacks").value = s.snacksPerDay;
   $("#vegetarian").checked = s.vegetarianOnly;
+  $("#servings").value = s.servings || 1;
+  $("#trackCalories").checked = s.trackCalories !== false;
+  toggleCalorieFields($("#trackCalories").checked);
   const prep = s.mealPrep || { breakfast: 0, lunch: 0, dinner: 0 };
   $("#prepBreakfast").value = prep.breakfast;
   $("#prepLunch").value = prep.lunch;
@@ -671,16 +693,24 @@ function formatTime(prepTime, cookTime) {
   return `⏱ ${prepTime} min prep · ${cookTime} min cook`;
 }
 
+function toggleCalorieFields(tracking) {
+  $("#calorieTargetRow").classList.toggle("hidden", !tracking);
+}
+
 function checkBudgetFeasibility() {
   const dailyCalories = Number($("#calories").value) || 0;
   const snacksPerDay = Number($("#snacks").value) || 1;
   const vegetarianOnly = $("#vegetarian").checked;
+  const trackCalories = $("#trackCalories").checked;
+  const servings = Number($("#servings").value) || 1;
   const dailyBudget = dailyBudgetFor($("#budgetPeriod").value, Number($("#budgetAmount").value) || 0);
-  const minDailyCost = estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly);
+  const minDailyCost = estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly, trackCalories, servings);
 
   const banner = $("#budgetWarning");
   if (dailyBudget < minDailyCost) {
-    banner.innerHTML = `⚠️ ${money(dailyBudget)}/day may not cover even the cheapest meals at this calorie target (~${money(minDailyCost)}/day minimum). Try raising your budget, lowering calories, or turning on Vegetarian only.`;
+    const forWhom = trackCalories ? "at this calorie target" : servings > 1 ? `for ${servings} people` : "for the cheapest meals";
+    const fix = trackCalories ? "raising your budget, lowering calories, or turning on Vegetarian only" : "raising your budget or turning on Vegetarian only";
+    banner.innerHTML = `⚠️ ${money(dailyBudget)}/day may not cover even the cheapest meals ${forWhom} (~${money(minDailyCost)}/day minimum). Try ${fix}.`;
     banner.classList.remove("hidden");
   } else {
     banner.classList.add("hidden");
@@ -903,7 +933,7 @@ function openRecipeModal(meal) {
   $("#recipeModal").showModal();
 }
 
-function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost) {
+function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost, trackCalories = true) {
   const t = day.totals;
   const overBudget = t.cost > dailyBudget * 1.05;
   const budgetClass = overBudget ? "bad" : "good";
@@ -911,11 +941,14 @@ function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost) {
   const suggestion = overBudget && dailyBudget < minDailyCost
     ? `<div class="budget-suggestion">Try raising your budget to ~${money(minDailyCost)}/day or turning on Vegetarian only.</div>`
     : "";
+  const calValue = trackCalories
+    ? `${Math.round(t.cal)} <span class="muted">/ ${dailyCalories} target (${calDiff >= 0 ? "+" : ""}${Math.round(calDiff)})</span>`
+    : `${Math.round(t.cal)} kcal`;
   return `
     <div class="day-summary">
       <div class="day-summary-item">
         <div class="label">Calories</div>
-        <div class="value">${Math.round(t.cal)} <span class="muted">/ ${dailyCalories} target (${calDiff >= 0 ? "+" : ""}${Math.round(calDiff)})</span></div>
+        <div class="value">${calValue}</div>
       </div>
       <div class="day-summary-item">
         <div class="label">Macros (P/C/F)</div>
@@ -957,7 +990,7 @@ function renderShoppingList(shoppingList, totalCost, totalBudget) {
         <label>
           <input type="checkbox" class="shopping-check" data-food="${i.food}" ${checked.has(i.food) ? "checked" : ""}>
           <span class="shopping-item-name">${i.name}</span>
-          <span class="shopping-item-qty">${grams(i.grams)}</span>
+          <span class="shopping-item-qty">${formatShoppingQty(i.food, i.grams)}</span>
           <span class="shopping-item-cost">${money(i.cost)}</span>
         </label>
       </li>`).join("");
@@ -982,10 +1015,12 @@ function renderShoppingList(shoppingList, totalCost, totalBudget) {
 // meal, laid out single-column (no spine) for clean print pagination.
 function renderPrintBooklet(result) {
   const { plan, summary } = result;
+  const calSegment = summary.trackCalories !== false ? ` · ${summary.dailyCalories} kcal/day` : "";
+  const servingsSegment = (summary.servings || 1) > 1 ? ` · for ${summary.servings} people` : "";
   const header = `
     <div class="booklet-header">
       <h1>BiteBudget Meal Plan</h1>
-      <p>${summary.days} days · ${summary.dailyCalories} kcal/day · ${money(summary.totalCost)} / ${money(summary.totalBudget)} budget</p>
+      <p>${summary.days} days${calSegment}${servingsSegment} · ${money(summary.totalCost)} / ${money(summary.totalBudget)} budget</p>
     </div>`;
 
   const days = plan.map(day => `
@@ -1029,6 +1064,15 @@ function renderPrintBooklet(result) {
   return header + days;
 }
 
+// "Makes 3 meals" alone gets ambiguous once a household size is set — a
+// batch of 3 meal-prepped occurrences at servings=4 actually makes 12 real
+// portions, so spell that out once servings isn't the default 1.
+function prepBatchServingsLabel(b) {
+  const mealWord = `meal${b.occurrences === 1 ? "" : "s"}`;
+  if (!b.servings || b.servings === 1) return `Makes ${b.occurrences} ${mealWord}`;
+  return `Makes ${b.occurrences} ${mealWord} × ${b.servings} servings each`;
+}
+
 // On-screen batch-cooking summary shown only in meal prep mode — one card
 // per distinct recipe across the whole plan (see groupIntoPrepBatches),
 // instead of the day-by-day cards below it.
@@ -1038,7 +1082,7 @@ function renderPrepBatches(batches) {
     <div class="prep-batch-card">
       <div class="prep-batch-slot">${slotIcon(b.slot)} ${b.slot}</div>
       <div class="prep-batch-name">${b.name}</div>
-      <div class="prep-batch-servings">🧺 Makes ${b.occurrences} serving${b.occurrences === 1 ? "" : "s"} · ${money(b.cost)}</div>
+      <div class="prep-batch-servings">🧺 ${prepBatchServingsLabel(b)} · ${money(b.cost)}</div>
       <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
       <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
     </div>`).join("");
@@ -1057,7 +1101,7 @@ function renderPrintPrepGuide(result) {
   const cards = sorted.map(b => `
     <div class="booklet-meal">
       <h3>${slotIcon(b.slot)} ${b.slot} — ${b.name}</h3>
-      <p class="booklet-meal-macros">Makes ${b.occurrences} serving${b.occurrences === 1 ? "" : "s"} · ${money(b.cost)} total</p>
+      <p class="booklet-meal-macros">${prepBatchServingsLabel(b)} · ${money(b.cost)} total</p>
       <div class="booklet-meal-body">
         <div>
           <strong>Total ingredients</strong>
@@ -1107,17 +1151,23 @@ function renderWeekOverview(plan) {
 function renderPlan(result) {
   currentPlanResult = result;
   const { plan, shoppingList, summary } = result;
+  const trackCalories = summary.trackCalories !== false;
+  const servings = summary.servings || 1;
   const targets = macroTargetGrams(summary.dailyCalories, summary.macroSplit);
-  const minDailyCost = estimateMinDailyCost(summary.dailyCalories, summary.snacksPerDay, summary.vegetarianOnly);
+  const minDailyCost = estimateMinDailyCost(summary.dailyCalories, summary.snacksPerDay, summary.vegetarianOnly, trackCalories, servings);
   const totalOverBudget = summary.totalCost > summary.totalBudget * 1.02;
   const totalSuggestion = totalOverBudget && summary.dailyBudget < minDailyCost
     ? `<div class="budget-suggestion">${money(summary.totalCost - summary.totalBudget)} over — try raising your budget to ~${money(minDailyCost * summary.days)} or turning on Vegetarian only.</div>`
     : "";
 
+  const targetMeta = trackCalories ? `
+    <div class="meta-item"><div class="label">Daily calorie target</div><div class="value">${summary.dailyCalories} kcal</div></div>
+    <div class="meta-item"><div class="label">Macro targets / day</div><div class="value">P ${grams(targets.protein)} · C ${grams(targets.carbs)} · F ${grams(targets.fat)}</div></div>` : "";
+
   $("#planMeta").innerHTML = `
     <div class="meta-item"><div class="label">Plan length</div><div class="value">${summary.days} days</div></div>
-    <div class="meta-item"><div class="label">Daily calorie target</div><div class="value">${summary.dailyCalories} kcal</div></div>
-    <div class="meta-item"><div class="label">Macro targets / day</div><div class="value">P ${grams(targets.protein)} · C ${grams(targets.carbs)} · F ${grams(targets.fat)}</div></div>
+    <div class="meta-item"><div class="label">Cooking for</div><div class="value">${servings} ${servings === 1 ? "person" : "people"}</div></div>
+    ${targetMeta}
     <div class="meta-item ${totalOverBudget ? "bad" : "good"}">
       <div class="label">Estimated total cost</div>
       <div class="value">${money(summary.totalCost)} <span class="muted">/ ${money(summary.totalBudget)} budget</span></div>
@@ -1136,7 +1186,7 @@ function renderPlan(result) {
   const tabs = plan.map(d => `<button class="day-tab" data-day="${d.day}">Day ${d.day}</button>`).join("");
   $("#dayTabs").innerHTML = tabs;
 
-  const dayViews = plan.map((d, di) => `<div class="day-view" data-day="${d.day}">${renderDayTab(d, di, summary.dailyBudget, summary.dailyCalories, minDailyCost)}</div>`).join("");
+  const dayViews = plan.map((d, di) => `<div class="day-view" data-day="${d.day}">${renderDayTab(d, di, summary.dailyBudget, summary.dailyCalories, minDailyCost, summary.trackCalories !== false)}</div>`).join("");
   $("#dayViews").innerHTML = dayViews;
 
   $("#shoppingList").innerHTML = renderShoppingList(shoppingList, summary.totalCost, summary.totalBudget);
@@ -1433,10 +1483,11 @@ function init() {
     commitPriceChanges();
   });
 
-  ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian"].forEach(sel => {
+  ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian", "#servings", "#trackCalories"].forEach(sel => {
     $(sel).addEventListener("input", checkBudgetFeasibility);
     $(sel).addEventListener("change", checkBudgetFeasibility);
   });
+  $("#trackCalories").addEventListener("change", (e) => toggleCalorieFields(e.target.checked));
   checkBudgetFeasibility();
 
   $("#printListBtn").addEventListener("click", () => {

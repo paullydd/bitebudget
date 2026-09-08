@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BiteBudget</title>
-<meta name="description" content="Plan varied, calorie- and macro-tracked meals that fit your grocery budget.">
+<meta name="description" content="Plan varied meals for your household that fit your grocery budget — track calories and macros if that's your goal.">
 <meta name="theme-color" content="#3f7d5c" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1e2420" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.json">
@@ -28,7 +28,7 @@
       <button type="button" id="themeToggle" class="icon-toggle-btn" aria-label="Toggle dark mode">🌙</button>
     </div>
     <h1><img src="icons/icon.svg" alt="" class="logo-mark"> BiteBudget</h1>
-    <p>Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
+    <p>Plan varied meals for your household that fit your grocery budget — track calories and macros if that's your goal.</p>
   </header>
 
   <div id="progressStrip" class="progress-strip hidden"></div>
@@ -43,7 +43,7 @@
     <section id="welcomeScreen" class="panel welcome-screen">
       <img src="icons/icon.svg" alt="BiteBudget logo" class="welcome-icon">
       <h2 class="welcome-title">BiteBudget</h2>
-      <p class="welcome-tagline">Plan varied, calorie- and macro-tracked meals that fit your grocery budget.</p>
+      <p class="welcome-tagline">Plan varied meals for your household that fit your grocery budget — track calories and macros if that's your goal.</p>
       <p id="welcomeQuote" class="welcome-quote"></p>
       <button type="button" id="getStartedBtn" class="primary-btn welcome-cta">Get Started</button>
       <button type="button" id="welcomeSkip" class="text-link-btn">Skip setup for now</button>
@@ -107,6 +107,15 @@
       </div>
 
       <div class="wizard-step" data-step="3">
+        <h3>How many people are you cooking for?</h3>
+        <p class="wizard-hint">Every recipe's ingredients scale to this — feeding a family of 4 gets you 4x the ingredients, not 4 separate plans.</p>
+        <div class="form-row">
+          <label for="obServings">Number of people</label>
+          <input type="number" id="obServings" min="1" max="12" value="1">
+        </div>
+      </div>
+
+      <div class="wizard-step" data-step="4">
         <h3>What's a meal you always come back to?</h3>
         <p class="wizard-hint">Your "favorite song" — pick which meal it's for, then the closest match.</p>
 
@@ -134,16 +143,25 @@
         </div>
       </div>
 
-      <div class="wizard-step" data-step="4">
-        <h3>How many calories per day?</h3>
-        <p class="wizard-hint">Slide or type — you can fine-tune this anytime in Settings.</p>
-        <div class="slider-row">
-          <input type="range" id="obCaloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
-          <input type="number" id="obCalories" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target (typed)">
+      <div class="wizard-step" data-step="5">
+        <h3>How are you planning?</h3>
+        <p class="wizard-hint">Some people want a calorie/macro target, others just want good meals within budget — both work.</p>
+        <div class="bubble-group" id="obTrackCaloriesYesNo">
+          <button type="button" class="bubble" data-value="no">No, just help me shop and plan</button>
+          <button type="button" class="bubble selected" data-value="yes">Yes, track a calorie/macro target</button>
+        </div>
+        <div id="obCaloriesDetails">
+          <div class="form-row">
+            <label for="obCalories">How many calories per day?</label>
+            <div class="slider-row">
+              <input type="range" id="obCaloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
+              <input type="number" id="obCalories" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target (typed)">
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="wizard-step" data-step="5">
+      <div class="wizard-step" data-step="6">
         <h3>What's your grocery budget?</h3>
         <p class="wizard-hint">Pick a period, then slide or type an amount.</p>
         <div class="bubble-group" id="obBudgetPeriod">
@@ -157,7 +175,7 @@
         </div>
       </div>
 
-      <div class="wizard-step" data-step="6">
+      <div class="wizard-step" data-step="7">
         <h3>Do you like to meal prep?</h3>
         <p class="wizard-hint">Batch-cook one recipe and eat it a few times instead of something new each day.</p>
         <div class="bubble-group" id="obMealPrepYesNo">
@@ -227,6 +245,15 @@
             </div>
 
             <div class="form-row">
+              <label for="servings">Cooking for how many people</label>
+              <input type="number" id="servings" min="1" max="12" value="1" required>
+            </div>
+
+            <div class="form-row checkbox-row">
+              <label><input type="checkbox" id="trackCalories" checked> 🎯 Track a calorie &amp; macro target</label>
+            </div>
+
+            <div class="form-row" id="calorieTargetRow">
               <label for="calories">Daily calorie target</label>
               <div class="slider-row">
                 <input type="range" id="caloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">

@@ -1,8 +1,10 @@
 # BiteBudget
 
-A lightweight, dependency-free web app that generates a varied, calorie- and
-macro-tracked meal plan (breakfast/lunch/dinner/snacks) that fits a grocery
-budget you set (daily, weekly, or monthly).
+A lightweight, dependency-free web app that generates a varied meal plan
+(breakfast/lunch/dinner/snacks) for your household that fits a grocery
+budget you set (daily, weekly, or monthly) — with a real shopping list at
+the end of it. Calorie and macro tracking is available if that's your
+goal, but it's optional, not the whole point.
 
 No build step, no npm install, no backend required — it's plain HTML/CSS/JS
 that runs in any modern browser.
@@ -26,13 +28,18 @@ that runs in any modern browser.
   against what its own name promises — a "Caesar" actually has Caesar
   dressing and parmesan, every stir-fry has a real sauce — no dish is
   missing the ingredient that makes it what it says it is.
-- **Calorie & macro tracking** — set a daily calorie target and a
-  protein/carb/fat split; every meal and day shows calories, protein, carbs,
-  and fat (MyFitnessPal-style breakdown), scaled from the ingredient
-  quantities. The split isn't just a label: the planner actively favors
-  meals whose own protein/carb/fat ratio is close to your target (see
-  "How the planner works" below), so a high-protein split actually results
-  in high-protein meals instead of just tracking whatever gets picked.
+- **Cooking for a household** — set how many people you're cooking for
+  (1–12) and every recipe's ingredients scale accordingly, both in the
+  recipe view and the shopping list — a family of 4 gets 4x the
+  ingredients on one plan, not four separate plans.
+- **Calorie & macro tracking (optional)** — turn it on to set a daily
+  calorie target and a protein/carb/fat split; every meal and day shows
+  calories, protein, carbs, and fat (MyFitnessPal-style breakdown), scaled
+  from the ingredient quantities, and the planner actively favors meals
+  whose own protein/carb/fat ratio is close to your target (see "How the
+  planner works" below). Turn it off and every recipe just uses its own
+  designed portion size — no target, no stretching, just good meals within
+  budget.
 - **Budget tracking** — set a daily, weekly, or monthly grocery budget. Each
   day and the whole plan show estimated cost vs. budget, and the planner
   actively favors cheaper meals once you're tracking over budget.
@@ -49,7 +56,9 @@ that runs in any modern browser.
   behind the scenes), so it's still exactly right after the planner scales
   a recipe up or down to hit your calorie target.
 - **Shopping list** — aggregates all ingredients across the whole plan into
-  one list with quantities and total estimated cost.
+  one list, in quantities you can actually buy ("1 dozen eggs", "1½ lb
+  chicken breast", "2 cups rice") instead of raw grams, plus a total
+  estimated cost.
 - **Vegetarian filter** and a "shuffle" button to regenerate with more
   variety without changing your settings.
 - **Adjustable text size** — A−/A+ controls in the header scale the whole
@@ -73,9 +82,10 @@ that runs in any modern browser.
   skippable, Spotify-style wizard: liked
   *and disliked* proteins (tap a protein once to like it, again to say "not
   for me," a third time to clear it) → up to 3 meal styles per meal (or "no
-  preference") → your calorie target → your grocery budget → your all-time
-  go-to meal → how many times a week you meal prep each meal, if at all.
-  Likes and dislikes both bias meal selection (dislikes
+  preference") → how many people you're cooking for → your all-time go-to
+  meal → whether to track a calorie/macro target (and if so, what it is) →
+  your grocery budget → how many times a week you meal prep each meal, if
+  at all. Likes and dislikes both bias meal selection (dislikes
   strongly, but never to a hard ban) without turning into a filter —
   variety is still preserved. Meal styles are the one exception: tap a
   style a second time to cross it off (red, struck through) and it's
@@ -128,7 +138,7 @@ that runs in any modern browser.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
-- **Meal prep** — step 6 of onboarding asks "Do you like to meal prep?";
+- **Meal prep** — the last step of onboarding asks "Do you like to meal prep?";
   say yes and you pick, per meal, how many times a week to batch-cook it
   (e.g. "Lunch — 4× this week") instead of a one-size-fits-all toggle —
   the other meals that week still stay fully varied. The same three
@@ -223,9 +233,15 @@ make it accurate for you:
    only the macro-fit narrowing applies.
 3. Scales the chosen template's ingredient quantities toward the slot's
    calorie target (bounded to 0.7x–1.4x so portions stay realistic), and
-   computes nutrition + cost.
-4. Aggregates every ingredient across the whole plan into a shopping list
-   with a total cost estimate.
+   computes nutrition + cost — or, with calorie tracking turned off, skips
+   this step entirely and uses the recipe at its own designed size, no
+   target to hit. Either way, the result is then multiplied by how many
+   people you're cooking for; nutrition stays per-person (so calorie/macro
+   tracking still means something for a household of any size) while cost
+   scales with the real amount being bought.
+4. Aggregates every ingredient across the whole plan into a shopping list,
+   converted into quantities you'd actually buy (a dozen eggs, pounds of
+   meat, whole cups of a pantry staple) with a total cost estimate.
 
 For each of breakfast/lunch/dinner you've set a meal-prep count on (e.g.
 lunch = 4), step 2 runs just once up front (via `selectPrepPool()`, same

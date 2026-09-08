@@ -124,7 +124,7 @@ const SERVING_UNITS = {
   brown_rice:       { unit: "cup",  grams: 195 },
   broccoli:         { unit: "cup",  grams: 91 },
   salmon:           { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
-  sweet_potato:     { unit: "sweet potato", grams: 130, round: 0.5 },
+  sweet_potato:     { unit: "sweet potato", grams: 130, round: 0.5, plural: "sweet potatoes" },
   black_beans:      { unit: "cup",  grams: 172 },
   spinach:          { unit: "cup",  grams: 30 },
   olive_oil:        { unit: "tbsp", grams: 14, noPlural: true },
@@ -162,7 +162,7 @@ const SERVING_UNITS = {
   canadian_bacon:   { unit: "slice", grams: 28, round: 0.5 },
   onion:            { unit: "cup",  grams: 160 },
   low_fat_cheddar:  { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
-  potato:           { unit: "potato", grams: 170, round: 0.5 },
+  potato:           { unit: "potato", grams: 170, round: 0.5, plural: "potatoes" },
   salsa:            { unit: "tbsp", grams: 17, noPlural: true },
   ground_turkey:    { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
   lettuce:          { unit: "cup",  grams: 47 },
@@ -216,6 +216,38 @@ function formatServing(food, grams) {
   const qty = grams / su.grams;
   const rounded = Math.round(qty / step) * step;
   if (rounded <= 0) return `${Math.round(grams)}g`;
-  const unit = rounded > 1 && !su.noPlural ? `${su.unit}s` : su.unit;
+  const unit = rounded > 1 && !su.noPlural ? (su.plural || `${su.unit}s`) : su.unit;
   return `${formatQty(rounded)} ${unit}`;
+}
+
+// Converts a food + total gram amount (summed across a whole week) into a
+// quantity you can actually put in a cart — always rounds UP, since you
+// can't buy a fraction of a physical item, unlike formatServing (which
+// rounds to the nearest fraction for reading a single recipe). Eggs are
+// special-cased to whole dozens since they aren't sold individually; meat
+// and cheese convert to pounds above 16oz; everything else with a
+// SERVING_UNITS entry ceils to a whole count. Falls back to grams for
+// anything not in SERVING_UNITS, same as formatServing.
+function formatShoppingQty(food, grams) {
+  if (grams <= 0) return "0g";
+  if (food === "egg") {
+    const eggs = grams / SERVING_UNITS.egg.grams;
+    const dozens = Math.ceil(eggs / 12);
+    return dozens <= 0 ? "0g" : `${dozens} dozen eggs`;
+  }
+  const su = SERVING_UNITS[food];
+  if (!su) return `${Math.round(grams)}g`;
+  const qty = grams / su.grams;
+  if (su.unit === "oz") {
+    const oz = Math.ceil(qty);
+    if (oz >= 16) {
+      const lb = Math.ceil((oz / 16) * 4) / 4;
+      return `${formatQty(lb)} lb`;
+    }
+    return `${oz} oz`;
+  }
+  const ceilQty = Math.ceil(qty);
+  if (ceilQty <= 0) return "0g";
+  const unit = ceilQty > 1 && !su.noPlural ? (su.plural || `${su.unit}s`) : su.unit;
+  return `${ceilQty} ${unit}`;
 }

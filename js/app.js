@@ -15,6 +15,10 @@ const PRICE_OVERRIDES_KEY = "biteBudget.priceOverrides.v1";
 // $X.XX)" next to each field and power "reset to defaults".
 const DEFAULT_PRICES = Object.fromEntries(Object.keys(FOODS).map(k => [k, FOODS[k].price]));
 const RECIPES_TRIED_KEY = "biteBudget.recipesTried.v1";
+// How many days a plan can sit before nudging "ready to plan next week?" —
+// loose enough that a plan generated mid-week (not always on the same day)
+// doesn't get flagged early, but still lands well inside a second week.
+const PLAN_STALE_DAYS = 6;
 const BADGES = [
   { id: "first_plan", icon: "🌱", name: "First Plan", desc: "Generate your first meal plan.", check: s => s.plansGenerated >= 1 },
   { id: "streak_3", icon: "🔥", name: "On a Roll", desc: "3 plans in a row under budget.", check: s => s.longestStreak >= 3 },
@@ -1241,6 +1245,7 @@ function renderPlan(result) {
 
   recordRecipesTried(plan);
   renderProgressStrip();
+  renderPlanNudge();
 }
 
 // Compact stats strip shown once there's any history — hidden for a
@@ -1259,6 +1264,40 @@ function renderProgressStrip() {
     <div class="progress-stat"><span class="progress-stat-value">${stats.plansGenerated}</span><span class="progress-stat-label">Plans</span></div>
     <button type="button" id="achievementsBtn" class="secondary-btn">🏅 Achievements</button>`;
   strip.classList.remove("hidden");
+}
+
+// Dismissed for the rest of this page load only (not persisted) — closing
+// it means "not right now," not "never remind me again." It reappears
+// naturally on the next visit if the plan is still stale then.
+let planNudgeDismissed = false;
+
+// "Ready to plan next week?" — the app has no accounts or push
+// notifications, so this is the only real way it can prompt a returning
+// visitor back into the habit: notice the active plan's history entry
+// hasn't been refreshed in a while and say so, right on the page they
+// already opened. Reuses the same date a genuine Generate Plan stamps
+// (recordNewHistoryEntry) — Shuffle/meal-swaps update that entry in place
+// without touching its date, so those don't reset the "week" clock.
+function renderPlanNudge() {
+  const nudge = $("#planNudge");
+  const history = loadHistory();
+  if (planNudgeDismissed || !currentPlanResult || history.length === 0) {
+    nudge.classList.add("hidden");
+    return;
+  }
+  const plannedAt = new Date(history[history.length - 1].date);
+  const daysSince = Math.floor((Date.now() - plannedAt) / (1000 * 60 * 60 * 24));
+  if (daysSince < PLAN_STALE_DAYS) {
+    nudge.classList.add("hidden");
+    return;
+  }
+  nudge.innerHTML = `
+    <span>🗓️ This plan is from ${daysSince} days ago — ready to plan next week?</span>
+    <span class="plan-nudge-actions">
+      <button type="button" id="planNudgeGoBtn" class="secondary-btn">Plan next week</button>
+      <button type="button" id="planNudgeDismissBtn" class="text-link-btn" aria-label="Dismiss">✕</button>
+    </span>`;
+  nudge.classList.remove("hidden");
 }
 
 function renderAchievements() {
@@ -1493,6 +1532,16 @@ function init() {
     if (!e.target.closest("#achievementsBtn")) return;
     renderAchievements();
     $("#achievementsDialog").showModal();
+  });
+
+  $("#planNudge").addEventListener("click", (e) => {
+    if (e.target.closest("#planNudgeGoBtn")) {
+      showSection("settings");
+      $("#planForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (e.target.closest("#planNudgeDismissBtn")) {
+      planNudgeDismissed = true;
+      $("#planNudge").classList.add("hidden");
+    }
   });
   $("#achievementsCloseBtn").addEventListener("click", () => $("#achievementsDialog").close());
   $("#achievementsDialog").addEventListener("click", (e) => {

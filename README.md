@@ -120,6 +120,13 @@ that runs in any modern browser.
 - **Reset app** — a footer link that clears everything (preferences,
   settings, saved plan, onboarding status) and reloads to the welcome
   screen, so you can see the app exactly as a brand-new visitor would.
+- **"Ready to plan next week?" nudge** — with no accounts or push
+  notifications, this is the app's only way to prompt you back into the
+  habit: if the active plan hasn't been freshly regenerated in about a
+  week, a banner says so with a one-click "Plan next week" that jumps to
+  Settings. Shuffling or swapping a single meal doesn't reset that clock —
+  only a genuine new Generate Plan does. Dismissing it lasts for the
+  current visit only; it reappears next time if the plan is still stale.
 - **Swap a single meal** — a 🔀 button on every meal card rerolls just that
   meal (same slot, same variety/preference/budget rules as a full generate)
   instead of "Shuffle" regenerating the whole week.

@@ -152,6 +152,29 @@ function applyBudgetSliderRange(rangeSel, numberSel, period) {
   numberEl.value = rangeEl.value; // read back the snapped value so both controls agree exactly
 }
 
+// A budget set for 1 person doesn't stretch to 2 — without this, bumping
+// "servings" up silently leaves the same dollar amount behind and every
+// plan reads as over budget the moment you touch the field. Scales the
+// existing budget by the same ratio the household size just changed by,
+// so a deliberately-set number for N people becomes the equivalent for
+// N+1 rather than needing to be manually doubled. The previous value is
+// tracked on the servings input itself (not a module variable) so it
+// survives across repeated changes and stays correct whether this is the
+// Settings panel's own fields or the onboarding wizard's separate copies.
+function scaleBudgetForServings(servingsSel, amountSel, sliderSel, period) {
+  const servingsEl = $(servingsSel);
+  const prev = Number(servingsEl.dataset.lastValue) || 1;
+  const next = Math.max(1, Number(servingsEl.value) || 1);
+  servingsEl.dataset.lastValue = next;
+  if (prev === next) return;
+
+  const range = BUDGET_SLIDER_RANGES[period] || BUDGET_SLIDER_RANGES.weekly;
+  const amountEl = $(amountSel);
+  const scaled = clamp(Math.round((Number(amountEl.value) * (next / prev)) / range.step) * range.step, range.min, range.max);
+  amountEl.value = scaled;
+  $(sliderSel).value = scaled;
+}
+
 let wizardStep = 1;
 
 // Keeps a bubble's aria-pressed/aria-label in sync with its visual state
@@ -336,8 +359,10 @@ function prefillOnboarding(prefs) {
 
   // Calorie/budget/servings aren't part of PREFS_KEY — they live in
   // Settings already, so seed the wizard's copies from whatever Settings
-  // currently holds.
+  // currently holds. lastValue is seeded too so the next servings edit
+  // scales budget relative to this real starting point, not a stale one.
   $("#obServings").value = $("#servings").value;
+  $("#obServings").dataset.lastValue = $("#obServings").value;
 
   $("#obCalories").value = $("#calories").value;
   $("#obCaloriesSlider").value = $("#calories").value;
@@ -410,6 +435,7 @@ function collectPreferences() {
 // convention — nothing is written to STORAGE_KEY until Generate Plan runs.
 function syncOnboardingIntoSettings() {
   $("#servings").value = $("#obServings").value;
+  $("#servings").dataset.lastValue = $("#servings").value;
 
   const trackCalories = document.querySelector("#obTrackCaloriesYesNo .bubble.selected")?.dataset.value === "yes";
   $("#trackCalories").checked = trackCalories;
@@ -578,6 +604,12 @@ function initOnboarding() {
     if (btn) applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", btn.dataset.value);
   });
 
+  $("#obServings").dataset.lastValue = $("#obServings").value;
+  $("#obServings").addEventListener("change", () => {
+    const period = document.querySelector("#obBudgetPeriod .bubble.selected")?.dataset.value || "weekly";
+    scaleBudgetForServings("#obServings", "#obBudgetAmount", "#obBudgetAmountSlider", period);
+  });
+
   wireBubbleGroup($("#obMealPrepYesNo"), "single");
   $("#obMealPrepYesNo").addEventListener("click", (e) => {
     const btn = e.target.closest(".bubble");
@@ -664,6 +696,7 @@ function writeSettingsToForm(s) {
   $("#snacks").value = s.snacksPerDay;
   $("#vegetarian").checked = s.vegetarianOnly;
   $("#servings").value = s.servings || 1;
+  $("#servings").dataset.lastValue = $("#servings").value;
   $("#trackCalories").checked = s.trackCalories !== false;
   toggleCalorieFields($("#trackCalories").checked);
   const prep = s.mealPrep || { breakfast: 0, lunch: 0, dinner: 0 };
@@ -1496,6 +1529,11 @@ function init() {
     savePriceOverrides({});
     renderPricesList();
     commitPriceChanges();
+  });
+
+  $("#servings").dataset.lastValue = $("#servings").value;
+  $("#servings").addEventListener("change", () => {
+    scaleBudgetForServings("#servings", "#budgetAmount", "#budgetAmountSlider", $("#budgetPeriod").value);
   });
 
   ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian", "#servings", "#trackCalories"].forEach(sel => {

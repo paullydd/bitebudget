@@ -31,7 +31,11 @@ that runs in any modern browser.
 - **Cooking for a household** — set how many people you're cooking for
   (1–12) and every recipe's ingredients scale accordingly, both in the
   recipe view and the shopping list — a family of 4 gets 4x the
-  ingredients on one plan, not four separate plans.
+  ingredients on one plan, not four separate plans. Your grocery budget
+  scales right along with it: bump household size from 1 to 2 and the
+  budget amount doubles automatically (a manually-set number is respected
+  and scales from there too), so a bigger household doesn't just start
+  out reading as over budget for no reason.
 - **Calorie & macro tracking (optional)** — turn it on to set a daily
   calorie target and a protein/carb/fat split; every meal and day shows
   calories, protein, carbs, and fat (MyFitnessPal-style breakdown), scaled

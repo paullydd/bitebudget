@@ -93,6 +93,8 @@ const FOODS = {
   mayo:            { name: "Mayonnaise",          protein: 1,    carbs: 1,    fat: 75,   price: 0.52, veg: true, category: "Pantry & Grains" },
   lavash_bread:    { name: "Lavash Bread",        protein: 10,   carbs: 55,   fat: 2,    price: 0.88, veg: true, category: "Pantry & Grains" },
   protein_pasta:   { name: "Protein Pasta (cooked)", protein: 20, carbs: 45,  fat: 2.5,  price: 0.64, veg: true, category: "Pantry & Grains" },
+  steak:           { name: "Steak",               protein: 27,   carbs: 0,    fat: 12,   price: 1.90, veg: false, category: "Protein", proteinFamily: "red_meat" },
+  cod:             { name: "Cod",                 protein: 18,   carbs: 0,    fat: 0.9,  price: 1.15, veg: false, category: "Protein", proteinFamily: "fish" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.
@@ -207,6 +209,8 @@ const SERVING_UNITS = {
   mayo:             { unit: "tbsp", grams: 14, noPlural: true },
   lavash_bread:     { unit: "sheet", grams: 85, round: 0.5 },
   protein_pasta:    { unit: "cup", grams: 140 },
+  steak:            { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
+  cod:              { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
 };
 
 // Renders a fraction as a whole number plus a unicode glyph (1¼, ½, 2¾, ...)

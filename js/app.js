@@ -141,13 +141,18 @@ function syncSlider(numberSel, rangeSel) {
 
 // Applies the budget slider's period-dependent min/max/step to both the
 // range and number input, clamping the current value into the new bounds.
-function applyBudgetSliderRange(rangeSel, numberSel, period) {
+// The floor scales with household size (servings) — a $20/week minimum
+// makes sense for 1 person but not for a family of 6, so it's harder to
+// casually land the slider somewhere the budget-feasibility warning would
+// immediately flag anyway.
+function applyBudgetSliderRange(rangeSel, numberSel, period, servings = 1) {
   const range = BUDGET_SLIDER_RANGES[period] || BUDGET_SLIDER_RANGES.weekly;
   const rangeEl = $(rangeSel), numberEl = $(numberSel);
-  rangeEl.min = numberEl.min = range.min;
+  const min = Math.min(range.min * Math.max(1, servings), range.max - range.step);
+  rangeEl.min = numberEl.min = min;
   rangeEl.max = numberEl.max = range.max;
   rangeEl.step = numberEl.step = range.step;
-  const clamped = clamp(Number(numberEl.value) || range.min, range.min, range.max);
+  const clamped = clamp(Number(numberEl.value) || min, min, range.max);
   rangeEl.value = clamped; // range inputs snap to the nearest step on assignment
   numberEl.value = rangeEl.value; // read back the snapped value so both controls agree exactly
 }
@@ -170,9 +175,10 @@ function scaleBudgetForServings(servingsSel, amountSel, sliderSel, period) {
 
   const range = BUDGET_SLIDER_RANGES[period] || BUDGET_SLIDER_RANGES.weekly;
   const amountEl = $(amountSel);
-  const scaled = clamp(Math.round((Number(amountEl.value) * (next / prev)) / range.step) * range.step, range.min, range.max);
+  const scaled = Math.round((Number(amountEl.value) * (next / prev)) / range.step) * range.step;
   amountEl.value = scaled;
-  $(sliderSel).value = scaled;
+  // Also re-applies the servings-scaled slider floor for the new headcount.
+  applyBudgetSliderRange(sliderSel, amountSel, period, next);
 }
 
 let wizardStep = 1;
@@ -374,7 +380,7 @@ function prefillOnboarding(prefs) {
   const periodBtn = document.querySelector(`#obBudgetPeriod .bubble[data-value="${period}"]`);
   if (periodBtn) periodBtn.classList.add("selected");
   $("#obBudgetAmount").value = $("#budgetAmount").value;
-  applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", period);
+  applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", period, Number($("#obServings").value) || 1);
 
   // Meal prep isn't part of PREFS_KEY either — same seed-from-Settings
   // approach, plus setting the Yes/No bubble and reveal state to match.
@@ -447,7 +453,7 @@ function syncOnboardingIntoSettings() {
   const period = periodBtn ? periodBtn.dataset.value : $("#budgetPeriod").value;
   $("#budgetPeriod").value = period;
   $("#budgetAmount").value = $("#obBudgetAmount").value;
-  applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", period);
+  applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", period, Number($("#servings").value) || 1);
 
   // "No" is authoritative — always zero out all three, even if the
   // (hidden) selects still hold values from a previous "Yes" answer.
@@ -601,7 +607,7 @@ function initOnboarding() {
   wireBubbleGroup($("#obBudgetPeriod"), "single");
   $("#obBudgetPeriod").addEventListener("click", (e) => {
     const btn = e.target.closest(".bubble");
-    if (btn) applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", btn.dataset.value);
+    if (btn) applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", btn.dataset.value, Number($("#obServings").value) || 1);
   });
 
   $("#obServings").dataset.lastValue = $("#obServings").value;
@@ -1310,11 +1316,11 @@ function init() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) writeSettingsToForm(JSON.parse(saved));
 
-  applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value);
+  applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value, Number($("#servings").value) || 1);
   syncSlider("#calories", "#caloriesSlider");
   syncSlider("#budgetAmount", "#budgetAmountSlider");
   $("#budgetPeriod").addEventListener("change", () => {
-    applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value);
+    applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value, Number($("#servings").value) || 1);
   });
 
   const savedPlan = localStorage.getItem(PLAN_KEY);

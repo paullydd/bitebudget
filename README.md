@@ -146,6 +146,14 @@ that runs in any modern browser.
 - **Favorite a recipe** — a ❤️ on any meal (card or recipe page) boosts it
   in future plans, on top of the existing protein-preference system — works
   even if you skipped onboarding entirely.
+- **"Not for me" (👎)** — sitting right next to the favorite button, this is
+  real feedback on one specific recipe, not just a taste-profile bias: mark
+  a meal you actually made and didn't like, and that exact recipe is
+  excluded from every future plan, permanently — the strongest signal in
+  the whole preference system, stronger even than a disliked protein or a
+  crossed-off style. Favoriting and disliking the same recipe are mutually
+  exclusive (picking one clears the other), since they're two verdicts on
+  the same thing.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.

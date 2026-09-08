@@ -7,6 +7,7 @@ const ONBOARDED_KEY = "biteBudget.onboarded.v1";
 const SHOPPING_CHECKED_KEY = "biteBudget.shoppingChecked.v1";
 const THEME_KEY = "biteBudget.theme.v1";
 const FAVORITES_KEY = "biteBudget.favorites.v1";
+const DISLIKED_RECIPES_KEY = "biteBudget.dislikedRecipes.v1";
 const HISTORY_KEY = "biteBudget.history.v1";
 const MY_MEALS_KEY = "biteBudget.myMeals.v1";
 const PRICE_OVERRIDES_KEY = "biteBudget.priceOverrides.v1";
@@ -489,32 +490,102 @@ function isFavorite(templateId) {
   return loadFavorites().has(templateId);
 }
 
-// Toggles one template's favorite state and updates every visible button
-// for it at once (the same recipe can appear more than once in a week).
-function toggleFavorite(templateId) {
-  const favorites = loadFavorites();
-  if (favorites.has(templateId)) favorites.delete(templateId); else favorites.add(templateId);
-  saveFavorites(favorites);
-
-  const nowFavorite = favorites.has(templateId);
+function setFavoriteButtonsState(templateId, nowFavorite) {
   document.querySelectorAll(`.favorite-btn[data-template-id="${templateId}"]`).forEach(btn => {
     btn.textContent = nowFavorite ? "❤️" : "🤍";
     btn.classList.toggle("active", nowFavorite);
     btn.setAttribute("aria-label", nowFavorite ? "Remove from favorites" : "Favorite this meal");
     btn.setAttribute("aria-pressed", nowFavorite ? "true" : "false");
   });
+  if (currentRecipeMealId === templateId) {
+    $("#recipeFavoriteBtn").textContent = nowFavorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
+    $("#recipeFavoriteBtn").classList.toggle("active", nowFavorite);
+  }
+}
+
+// Toggles one template's favorite state and updates every visible button
+// for it at once (the same recipe can appear more than once in a week).
+// Favoriting a recipe you'd previously marked "not for me" clears that —
+// they're two verdicts on the same thing, not independent toggles.
+function toggleFavorite(templateId) {
+  const favorites = loadFavorites();
+  if (favorites.has(templateId)) favorites.delete(templateId); else favorites.add(templateId);
+  saveFavorites(favorites);
+  const nowFavorite = favorites.has(templateId);
+
+  if (nowFavorite) {
+    const disliked = loadDislikedRecipes();
+    if (disliked.has(templateId)) {
+      disliked.delete(templateId);
+      saveDislikedRecipes(disliked);
+      setDislikeButtonsState(templateId, false);
+    }
+  }
+
+  setFavoriteButtonsState(templateId, nowFavorite);
   return nowFavorite;
 }
 
-// Preferences saved during onboarding, plus favorites layered on top —
-// favorites work even if onboarding was skipped entirely. Stays undefined
-// (matching generatePlan's no-preferences behavior) when neither exists.
+function loadDislikedRecipes() {
+  const saved = localStorage.getItem(DISLIKED_RECIPES_KEY);
+  return saved ? new Set(JSON.parse(saved)) : new Set();
+}
+
+function saveDislikedRecipes(disliked) {
+  localStorage.setItem(DISLIKED_RECIPES_KEY, JSON.stringify([...disliked]));
+}
+
+function isDislikedRecipe(templateId) {
+  return loadDislikedRecipes().has(templateId);
+}
+
+function setDislikeButtonsState(templateId, nowDisliked) {
+  document.querySelectorAll(`.dislike-btn[data-template-id="${templateId}"]`).forEach(btn => {
+    btn.classList.toggle("active", nowDisliked);
+    btn.setAttribute("aria-label", nowDisliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again");
+    btn.setAttribute("aria-pressed", nowDisliked ? "true" : "false");
+  });
+  if (currentRecipeMealId === templateId) {
+    $("#recipeDislikeBtn").textContent = nowDisliked ? "👎 Not for me" : "👎 Not for me?";
+    $("#recipeDislikeBtn").classList.toggle("active", nowDisliked);
+  }
+}
+
+// Marking a recipe "not for me" is a real, permanent exclusion (see
+// pickTemplate in planner.js) — much stronger than the soft preference
+// bias everything else in this system uses, since it's the most specific,
+// deliberate feedback a user can give about one exact recipe. Mutually
+// exclusive with favoriting, same reasoning as toggleFavorite above.
+function toggleDislikedRecipe(templateId) {
+  const disliked = loadDislikedRecipes();
+  if (disliked.has(templateId)) disliked.delete(templateId); else disliked.add(templateId);
+  saveDislikedRecipes(disliked);
+  const nowDisliked = disliked.has(templateId);
+
+  if (nowDisliked) {
+    const favorites = loadFavorites();
+    if (favorites.has(templateId)) {
+      favorites.delete(templateId);
+      saveFavorites(favorites);
+      setFavoriteButtonsState(templateId, false);
+    }
+  }
+
+  setDislikeButtonsState(templateId, nowDisliked);
+  return nowDisliked;
+}
+
+// Preferences saved during onboarding, plus favorites/dislikes layered on
+// top — both work even if onboarding was skipped entirely. Stays
+// undefined (matching generatePlan's no-preferences behavior) only when
+// none of the three exist.
 function loadPreferences() {
   const saved = localStorage.getItem(PREFS_KEY);
   const prefs = saved ? JSON.parse(saved) : null;
   const favoriteIds = [...loadFavorites()];
-  if (!prefs && favoriteIds.length === 0) return undefined;
-  return { ...(prefs || {}), favoriteIds };
+  const dislikedRecipeIds = [...loadDislikedRecipes()];
+  if (!prefs && favoriteIds.length === 0 && dislikedRecipeIds.length === 0) return undefined;
+  return { ...(prefs || {}), favoriteIds, dislikedRecipeIds };
 }
 
 function loadHistory() {
@@ -782,12 +853,14 @@ function renderMealCard(meal, dayIndex, mealIndex) {
 
   const n = meal.nutrition;
   const favorite = !meal.custom && isFavorite(meal.id);
+  const disliked = !meal.custom && isDislikedRecipe(meal.id);
   const actionButtons = meal.custom
     ? `
         <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Edit this meal" title="Edit this meal">✏️</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Replace with an auto-picked meal" title="Replace with an auto-picked meal">↩️</button>`
     : `
         <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
+        <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${meal.id}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
         <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Log your own meal instead" title="Log your own meal instead">📝</button>`;
 
@@ -970,6 +1043,9 @@ function openRecipeModal(meal) {
   const favorite = isFavorite(meal.id);
   $("#recipeFavoriteBtn").textContent = favorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
   $("#recipeFavoriteBtn").classList.toggle("active", favorite);
+  const disliked = isDislikedRecipe(meal.id);
+  $("#recipeDislikeBtn").textContent = disliked ? "👎 Not for me" : "👎 Not for me?";
+  $("#recipeDislikeBtn").classList.toggle("active", disliked);
   $("#nutritionLabel").innerHTML = renderNutritionLabel(n);
   $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("");
   $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${s}</li>`).join("");
@@ -1439,6 +1515,12 @@ function init() {
     const favoriteBtn = e.target.closest(".favorite-btn");
     if (favoriteBtn) {
       toggleFavorite(favoriteBtn.dataset.templateId);
+      return;
+    }
+
+    const dislikeBtn = e.target.closest(".dislike-btn");
+    if (dislikeBtn) {
+      toggleDislikedRecipe(dislikeBtn.dataset.templateId);
     }
   });
 
@@ -1458,9 +1540,11 @@ function init() {
   });
   $("#recipeFavoriteBtn").addEventListener("click", () => {
     if (!currentRecipeMealId) return;
-    const nowFavorite = toggleFavorite(currentRecipeMealId);
-    $("#recipeFavoriteBtn").textContent = nowFavorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
-    $("#recipeFavoriteBtn").classList.toggle("active", nowFavorite);
+    toggleFavorite(currentRecipeMealId); // updates #recipeFavoriteBtn itself too
+  });
+  $("#recipeDislikeBtn").addEventListener("click", () => {
+    if (!currentRecipeMealId) return;
+    toggleDislikedRecipe(currentRecipeMealId); // updates #recipeDislikeBtn itself too
   });
 
   $("#customMealCloseBtn").addEventListener("click", () => $("#customMealDialog").close());

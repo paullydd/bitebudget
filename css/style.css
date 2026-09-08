@@ -587,7 +587,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
    group can never get pushed past the card's edge, however long the name. */
 .meal-head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
 .meal-cost { font-weight: 700; color: var(--accent-dark); }
-.meal-swap-btn, .favorite-btn, .custom-meal-btn {
+.meal-swap-btn, .favorite-btn, .dislike-btn, .custom-meal-btn {
   border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 8px;
@@ -596,8 +596,9 @@ form { display: flex; flex-direction: column; gap: 16px; }
   cursor: pointer;
   line-height: 1;
 }
-.meal-swap-btn:hover, .favorite-btn:hover, .custom-meal-btn:hover { background: var(--hover-bg); }
+.meal-swap-btn:hover, .favorite-btn:hover, .dislike-btn:hover, .custom-meal-btn:hover { background: var(--hover-bg); }
 .favorite-btn.active { border-color: var(--bad); }
+.dislike-btn.active { background: var(--bad); border-color: var(--bad); filter: grayscale(0.4); }
 .meal-macros { display: flex; gap: 12px; margin: 10px 0; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
 .custom-meal-card { border-left: 3px solid var(--accent); }
 .pending-meal-card { border-style: dashed; background: transparent; }
@@ -669,7 +670,8 @@ form { display: flex; flex-direction: column; gap: 16px; }
 }
 .recipe-title { font-size: 1.7rem; margin: 0 0 10px; }
 .recipe-macros { font-family: "Segoe UI", system-ui, sans-serif; font-size: 0.82rem; color: #6b5f45; margin-bottom: 14px; }
-.recipe-favorite-btn {
+.recipe-verdict-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.recipe-favorite-btn, .recipe-dislike-btn {
   font-family: "Segoe UI", system-ui, sans-serif;
   border: 1px solid #cabf9e;
   background: #fdf8ee;
@@ -680,8 +682,9 @@ form { display: flex; flex-direction: column; gap: 16px; }
   font-weight: 600;
   cursor: pointer;
 }
-.recipe-favorite-btn:hover { background: #f3ead4; }
+.recipe-favorite-btn:hover, .recipe-dislike-btn:hover { background: #f3ead4; }
 .recipe-favorite-btn.active { border-color: #b3441e; color: #8a3212; }
+.recipe-dislike-btn.active { border-color: #5c5648; background: #5c5648; color: #fdf8ee; }
 
 /* ---------- FDA-style nutrition label: deliberately monochrome ---------- */
 .nutrition-label {

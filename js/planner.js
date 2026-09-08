@@ -121,6 +121,15 @@ function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, 
     if (filtered.length > 0) pool = filtered;
   }
 
+  // A specific recipe marked "not for me" is an even stronger, more
+  // deliberate signal than a crossed-off style — the user actually looked
+  // at (or cooked) this exact recipe and said no — so it's excluded the
+  // same hard-filter-with-safety-valve way.
+  if (preferences && preferences.dislikedRecipeIds && preferences.dislikedRecipeIds.length) {
+    const filtered = pool.filter(t => !preferences.dislikedRecipeIds.includes(t.id));
+    if (filtered.length > 0) pool = filtered;
+  }
+
   let fresh = pool.filter(t => !recentIds.includes(t.id));
   if (fresh.length === 0) fresh = pool; // all recently used, allow repeats
 

@@ -181,7 +181,12 @@ that runs in any modern browser.
   total saved, plans generated) appears once you've generated at least one
   plan, and an Achievements dialog tracks milestones (budget streaks, total
   saved, recipes tried, favorites) — all computed from data already stored
-  locally, nothing new to sign up for.
+  locally, nothing new to sign up for. A "📊 History" button opens a real
+  spending record: every past plan as a cost-vs-budget bar on a shared
+  scale (so weeks are visually comparable, not just each against its own
+  budget), newest first, with a summary of total saved and your streaks up
+  top — turns the budget tracker into an actual growing record instead of
+  a number that resets every week.
 
 ## Running it
 

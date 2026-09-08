@@ -1338,6 +1338,7 @@ function renderProgressStrip() {
     <div class="progress-stat"><span class="progress-stat-value">${stats.currentStreak}</span><span class="progress-stat-label">Streak</span></div>
     <div class="progress-stat"><span class="progress-stat-value">${money(stats.totalSaved)}</span><span class="progress-stat-label">Saved</span></div>
     <div class="progress-stat"><span class="progress-stat-value">${stats.plansGenerated}</span><span class="progress-stat-label">Plans</span></div>
+    <button type="button" id="historyBtn" class="secondary-btn">📊 History</button>
     <button type="button" id="achievementsBtn" class="secondary-btn">🏅 Achievements</button>`;
   strip.classList.remove("hidden");
 }
@@ -1387,6 +1388,47 @@ function renderAchievements() {
         <div class="badge-desc">${b.desc}</div>
       </div>`;
   }).join("");
+}
+
+// One row per planning session (loadHistory() — a genuine Generate Plan,
+// refined in place by any later Shuffle/swap/price-edit on that same
+// plan), most recent first, each a cost-vs-budget bar on a shared scale
+// so weeks are visually comparable to each other, not just to their own
+// budget. No charting library — this is a small, static bar list, well
+// within what plain CSS divs can do without a dependency.
+function renderHistoryView() {
+  const history = loadHistory();
+  const stats = computeHistoryStats(history);
+
+  $("#historySummary").innerHTML = `
+    <div class="progress-stat"><span class="progress-stat-value">${money(stats.totalSaved)}</span><span class="progress-stat-label">Total Saved</span></div>
+    <div class="progress-stat"><span class="progress-stat-value">${stats.currentStreak}</span><span class="progress-stat-label">Current Streak</span></div>
+    <div class="progress-stat"><span class="progress-stat-value">${stats.longestStreak}</span><span class="progress-stat-label">Best Streak</span></div>
+    <div class="progress-stat"><span class="progress-stat-value">${stats.plansGenerated}</span><span class="progress-stat-label">Plans</span></div>`;
+
+  if (history.length === 0) {
+    $("#historyList").innerHTML = `<p class="history-empty">Generate your first plan to start building a history.</p>`;
+    return;
+  }
+
+  const maxValue = Math.max(1, ...history.flatMap(h => [h.totalCost, h.totalBudget]));
+  const rows = [...history].reverse().map(h => {
+    const over = h.totalCost > h.totalBudget;
+    const diff = Math.abs(h.totalBudget - h.totalCost);
+    const dateLabel = new Date(`${h.date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    const costPct = clamp((h.totalCost / maxValue) * 100, 0, 100);
+    const budgetPct = clamp((h.totalBudget / maxValue) * 100, 0, 100);
+    return `
+      <div class="history-row">
+        <div class="history-date">${dateLabel}<span class="history-days">${h.days}d</span></div>
+        <div class="history-bar-track">
+          <div class="history-bar-cost ${over ? "bad" : "good"}" style="width: ${costPct}%"></div>
+          <div class="history-budget-marker" style="left: ${budgetPct}%" title="Budget: ${money(h.totalBudget)}"></div>
+        </div>
+        <div class="history-amount ${over ? "bad" : "good"}">${over ? "+" : "−"}${money(diff)}</div>
+      </div>`;
+  }).join("");
+  $("#historyList").innerHTML = rows;
 }
 
 const SECTION_IDS = { settings: "settingsPanel", week: "resultsWeek", shopping: "resultsShopping" };
@@ -1613,9 +1655,17 @@ function init() {
   });
 
   $("#progressStrip").addEventListener("click", (e) => {
-    if (!e.target.closest("#achievementsBtn")) return;
-    renderAchievements();
-    $("#achievementsDialog").showModal();
+    if (e.target.closest("#achievementsBtn")) {
+      renderAchievements();
+      $("#achievementsDialog").showModal();
+    } else if (e.target.closest("#historyBtn")) {
+      renderHistoryView();
+      $("#historyDialog").showModal();
+    }
+  });
+  $("#historyCloseBtn").addEventListener("click", () => $("#historyDialog").close());
+  $("#historyDialog").addEventListener("click", (e) => {
+    if (e.target === $("#historyDialog")) $("#historyDialog").close();
   });
 
   $("#planNudge").addEventListener("click", (e) => {

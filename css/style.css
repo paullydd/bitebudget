@@ -211,6 +211,36 @@ body {
 .badge-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 4px; }
 .badge-desc { font-size: 0.76rem; color: var(--muted); }
 
+/* ---------- Spending history ---------- */
+.history-summary {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.history-list { display: flex; flex-direction: column; gap: 10px; }
+.history-row { display: grid; grid-template-columns: 56px 1fr 84px; align-items: center; gap: 12px; font-size: 0.85rem; }
+.history-date { display: flex; flex-direction: column; font-weight: 600; line-height: 1.2; }
+.history-days { font-size: 0.7rem; color: var(--muted); font-weight: 400; }
+.history-bar-track {
+  position: relative;
+  height: 16px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.history-bar-cost { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; }
+.history-bar-cost.good { background: var(--good); }
+.history-bar-cost.bad { background: var(--bad); }
+.history-budget-marker { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: 0.55; }
+.history-amount { text-align: right; font-weight: 700; }
+.history-amount.good { color: var(--good); }
+.history-amount.bad { color: var(--bad); }
+.history-empty { text-align: center; color: var(--muted); padding: 24px 0; }
+
 .header-toolbar {
   display: flex;
   align-items: center;

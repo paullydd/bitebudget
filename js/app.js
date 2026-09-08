@@ -1080,8 +1080,13 @@ function renderPrepBatches(batches) {
   const sorted = [...batches].sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
   return sorted.map(b => `
     <div class="prep-batch-card">
-      <div class="prep-batch-slot">${slotIcon(b.slot)} ${b.slot}</div>
-      <div class="prep-batch-name">${b.name}</div>
+      <div class="prep-batch-head">
+        <div>
+          <div class="prep-batch-slot">${slotIcon(b.slot)} ${b.slot}</div>
+          <div class="prep-batch-name">${b.name}</div>
+        </div>
+        <button type="button" class="prep-batch-shuffle-btn" data-batch-id="${b.id}" aria-label="Prep a different recipe instead" title="Prep a different recipe instead">🔀</button>
+      </div>
       <div class="prep-batch-servings">🧺 ${prepBatchServingsLabel(b)} · ${money(b.cost)}</div>
       <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
       <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
@@ -1357,6 +1362,16 @@ function init() {
     if (favoriteBtn) {
       toggleFavorite(favoriteBtn.dataset.templateId);
     }
+  });
+
+  $("#prepBatches").addEventListener("click", (e) => {
+    if (!currentPlanResult) return;
+    const shuffleBtn = e.target.closest(".prep-batch-shuffle-btn");
+    if (!shuffleBtn) return;
+    regeneratePrepBatch(currentPlanResult, shuffleBtn.dataset.batchId, readSettings(), loadPreferences());
+    updateLatestHistoryEntry(currentPlanResult.summary);
+    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
+    renderPlan(currentPlanResult);
   });
 
   $("#recipeCloseBtn").addEventListener("click", () => $("#recipeModal").close());

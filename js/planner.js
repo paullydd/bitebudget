@@ -218,16 +218,38 @@ function buildShoppingList(plan) {
   })).sort((a, b) => b.cost - a.cost);
 }
 
+// Styles that don't hold up as a cook-once-eat-all-week batch — a wrap or
+// salad assembled Sunday is soggy/wilted by Wednesday, and a smoothie
+// separates in the fridge. Bowls, stir-fries, and soups portion and reheat
+// fine, so meal prep only ever auto-picks from those by default.
+const PREP_UNFRIENDLY_STYLES = { breakfast: ["smoothie"], lunch: ["wrap_sandwich", "salad"], dinner: ["wrap_sandwich", "salad"] };
+
+// Merges the prep-unfriendly styles into a slot's excludedMealStyle so
+// pickTemplate's existing hard-filter-with-safety-valve does the work —
+// this only affects which recipe gets chosen for a meal-prep batch, not
+// the user's own style preferences for ordinary (non-prepped) days.
+function withPrepStyleFilter(preferences, slot) {
+  const unfriendly = PREP_UNFRIENDLY_STYLES[slot];
+  if (!unfriendly) return preferences;
+  const existing = (preferences && preferences.excludedMealStyle && preferences.excludedMealStyle[slot]) || [];
+  const merged = [...new Set([...existing, ...unfriendly])];
+  return {
+    ...(preferences || {}),
+    excludedMealStyle: { ...((preferences && preferences.excludedMealStyle) || {}), [slot]: merged },
+  };
+}
+
 // Picks `count` distinct templates for a slot up front — used by meal prep
 // mode to fix a small rotating set for the whole week instead of a fresh
 // pick per day. Reuses pickTemplate's full weighting (macro-fit,
 // preferences, budget); each pick feeds the next call's avoid-list so the
 // pool members are distinct, the same trick the day loop already uses.
 function selectPrepPool(slot, count, vegetarianOnly, preferences, macroSplit) {
+  const prepPreferences = withPrepStyleFilter(preferences, slot);
   const pool = [];
   const usedIds = [];
   for (let i = 0; i < count; i++) {
-    const template = pickTemplate(slot, usedIds, vegetarianOnly, false, preferences, macroSplit);
+    const template = pickTemplate(slot, usedIds, vegetarianOnly, false, prepPreferences, macroSplit);
     pool.push(template);
     usedIds.push(template.id);
   }
@@ -392,6 +414,53 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences) {
     prepTime: template.prepTime, cookTime: template.cookTime,
   };
   recomputeDayTotals(day);
+
+  result.shoppingList = buildShoppingList(result.plan);
+  result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
+  return result;
+}
+
+// Rerolls a whole meal-prep batch — every day's occurrence of that recipe,
+// not just one meal — to a different prep-friendly recipe for the same
+// slot. All occurrences share one target calorie (a slot's target is the
+// same every day) so the new pick is scaled once and reused everywhere,
+// exactly like the initial batch pick in generatePlan.
+function regeneratePrepBatch(result, batchId, settings, preferences) {
+  const { dailyCalories, macroSplit, vegetarianOnly } = settings;
+  const trackCalories = settings.trackCalories !== false;
+  const servings = settings.servings || 1;
+  const effectiveMacroSplit = trackCalories ? macroSplit : null;
+  const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
+
+  let slot = null;
+  result.plan.forEach(day => {
+    day.meals.forEach(m => {
+      if (m.prepped && m.id === batchId) slot = m.slot;
+    });
+  });
+  if (!slot) return result;
+
+  const targetCal = dailyCalories * slotPct[slot];
+  const prepPreferences = withPrepStyleFilter(preferences, slot);
+  const template = pickTemplate(slot, [batchId], vegetarianOnly, false, prepPreferences, effectiveMacroSplit);
+
+  const base = computeNutrition(template.items);
+  const factor = computeFactor(base, targetCal, trackCalories);
+  const personItems = scaleItems(template.items, factor);
+  const personNutrition = computeNutrition(personItems);
+  const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
+
+  result.plan.forEach(day => {
+    day.meals.forEach((m, i) => {
+      if (!m.prepped || m.id !== batchId) return;
+      day.meals[i] = {
+        slot, id: template.id, name: template.name, items, instructions: template.instructions,
+        nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
+        servings, prepTime: template.prepTime, cookTime: template.cookTime, prepped: true,
+      };
+    });
+    recomputeDayTotals(day);
+  });
 
   result.shoppingList = buildShoppingList(result.plan);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);

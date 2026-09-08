@@ -535,8 +535,20 @@ form { display: flex; flex-direction: column; gap: 16px; }
 
 .prep-batches-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px; }
 .prep-batch-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--panel-alt); }
+.prep-batch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .prep-batch-slot { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
 .prep-batch-name { font-weight: 700; margin: 2px 0 6px; }
+.prep-batch-shuffle-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.prep-batch-shuffle-btn:hover { background: var(--hover-bg); }
 .prep-batch-servings { font-size: 0.85rem; color: var(--accent-dark); font-weight: 600; margin-bottom: 8px; }
 .prep-batch-items { font-size: 0.85rem; color: var(--muted); margin: 0 0 10px; padding-left: 18px; }
 .prep-batch-note { font-size: 0.8rem; color: var(--muted); margin: 0; border-top: 1px solid var(--border); padding-top: 8px; }

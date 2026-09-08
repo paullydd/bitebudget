@@ -146,7 +146,12 @@ that runs in any modern browser.
   without re-running the wizard. A "🧺 This Week's Batches" summary (and a
   matching print guide) shows only the recipes you actually chose to
   batch — total quantity, servings made, and a storage/reheating note —
-  never a coincidental repeat from ordinary variety-picking.
+  never a coincidental repeat from ordinary variety-picking. Only recipes
+  that actually hold up as a make-ahead batch are ever auto-picked (bowls,
+  stir-fries, soups — never a wrap/sandwich or salad, which just don't
+  keep for a week), and a 🔀 on each batch card rerolls just that one
+  recipe — every day it repeats on updates together — without touching
+  the rest of the plan.
 - **Edit Prices** — a "💲 Edit Prices" button in the header opens every
   food's price in one place, grouped by grocery-store section, each shown
   next to its shipped national-average default. Change what you actually

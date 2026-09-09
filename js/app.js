@@ -34,7 +34,14 @@ const BADGES = [
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const SLOT_ORDER = ["breakfast", "lunch", "dinner", "snack"];
 const PREP_STORAGE_NOTE = "Store in airtight containers in the fridge up to 4 days, or freeze up to 3 months. Reheat covered until steaming.";
-const WIZARD_TOTAL_STEPS = 7;
+const WIZARD_TOTAL_STEPS = 8;
+// Only appliances that actually change which recipes are available get a
+// bubble — no shortcuts here either: several recipes already mention an
+// air fryer or microwave, but always as an optional alternative to the
+// oven/stovetop already in the instructions, so excluding them wouldn't
+// change anything. Blender and slow cooker each gate real recipes with
+// no such alternative (see requiresAppliance in js/meals.js).
+const ALL_APPLIANCES = ["blender", "slow_cooker"];
 const STYLE_GROUP_IDS = { breakfast: "styleBreakfast", lunch: "styleLunch", dinner: "styleDinner" };
 const BUDGET_SLIDER_RANGES = {
   daily: { min: 5, max: 150, step: 5 },
@@ -369,6 +376,17 @@ function prefillOnboarding(prefs) {
     }
   }
 
+  // Appliance bubbles start selected in the markup, but clearBubbleSelections()
+  // above wiped that along with everything else — restore "has it" (selected)
+  // for every appliance except the ones actually saved as missing, so
+  // reopening Preferences with nothing saved yet still defaults to "has
+  // everything" rather than leaving every bubble blank.
+  const missingAppliances = (prefs && prefs.missingAppliances) || [];
+  ALL_APPLIANCES.forEach(a => {
+    const b = document.querySelector(`#applianceBubbles .bubble[data-value="${a}"]`);
+    if (b) b.classList.toggle("selected", !missingAppliances.includes(a));
+  });
+
   // Calorie/budget/servings aren't part of PREFS_KEY — they live in
   // Settings already, so seed the wizard's copies from whatever Settings
   // currently holds. lastValue is seeded too so the next servings edit
@@ -423,6 +441,11 @@ function collectPreferences() {
     if (excluded.length) excludedMealStyle[slot] = excluded;
   });
 
+  // Bubbles start selected (has it) — anything left unselected is what
+  // the user actively said they don't have, mirroring excludedMealStyle's
+  // "positive list of exclusions" shape rather than a list of what they do have.
+  const missingAppliances = ALL_APPLIANCES.filter(a => !document.querySelector(`#applianceBubbles .bubble[data-value="${a}"]`)?.classList.contains("selected"));
+
   const sigSlotBtn = document.querySelector("#signatureSlot .bubble.selected");
   const sigPresetBtn = document.querySelector("#signaturePreset .bubble.selected");
   const note = $("#signatureNote").value.trim();
@@ -440,6 +463,7 @@ function collectPreferences() {
     dislikedProteins: dislikedProteins.length ? dislikedProteins : undefined,
     mealStyle: Object.keys(mealStyle).length ? mealStyle : undefined,
     excludedMealStyle: Object.keys(excludedMealStyle).length ? excludedMealStyle : undefined,
+    missingAppliances: missingAppliances.length ? missingAppliances : undefined,
     signature,
   };
 }
@@ -694,6 +718,7 @@ function computeStats() {
 function initOnboarding() {
   wireBubbleGroup($("#proteinBubbles"), "tristate");
   Object.values(STYLE_GROUP_IDS).forEach(id => wireBubbleGroup($(`#${id}`), "style-tristate", { max: 3 }));
+  wireBubbleGroup($("#applianceBubbles"), "multi");
   wireBubbleGroup($("#signatureSlot"), "single");
   wireBubbleGroup($("#signaturePreset"), "single");
 

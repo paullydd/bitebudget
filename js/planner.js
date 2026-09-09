@@ -111,6 +111,17 @@ function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, 
   let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
   if (vegetarianOnly) pool = pool.filter(t => isVegetarian(t.items));
 
+  // Equipment you don't have is a hard constraint, not a taste
+  // preference — a recipe that needs a blender or slow cooker is
+  // genuinely uncookable without one, so this is checked before any
+  // style/taste filtering. Same safety valve as every other hard filter
+  // here: never let it empty the pool out entirely.
+  if (preferences && preferences.missingAppliances && preferences.missingAppliances.length) {
+    const missing = preferences.missingAppliances;
+    const filtered = pool.filter(t => !(t.requiresAppliance || []).some(a => missing.includes(a)));
+    if (filtered.length > 0) pool = filtered;
+  }
+
   // A style the user has crossed off is a genuine hard filter (unlike the
   // rest of the preference system, which only ever biases weight) — but
   // never let it empty a slot out entirely; skip it rather than break

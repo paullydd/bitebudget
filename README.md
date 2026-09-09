@@ -18,7 +18,7 @@ that runs in any modern browser.
   and everything else (shuffling, swapping a meal, editing prices) leaves
   you exactly where you were instead of jumping you around.
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 107 built-in recipe templates
+  day for a plan of 1–14 days, rotating through 109 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3
   templates for every meal style (bowl, wrap/sandwich, stir-fry, soup, salad,
   smoothie) at both lunch and dinner, plus high-protein snacks (protein
@@ -36,6 +36,16 @@ that runs in any modern browser.
   budget amount doubles automatically (a manually-set number is respected
   and scales from there too), so a bigger household doesn't just start
   out reading as over budget for no reason.
+- **Appliance-aware recipes** — onboarding asks what you have (🌀 Blender,
+  🐢 Slow Cooker for now — everything's assumed available by default, tap
+  one off if you don't have it), and recipes that genuinely need it are
+  excluded, the same hard-filter mechanism as a crossed-off meal style or
+  a disliked recipe. Deliberately not a longer checklist of every
+  appliance under the sun: several recipes already mention an air fryer
+  or microwave, but always as an optional alternative to the oven/
+  stovetop already in the instructions, so there'd be nothing to actually
+  exclude — only equipment that changes which recipes are makeable gets a
+  toggle.
 - **Calorie & macro tracking (optional)** — turn it on to set a daily
   calorie target and a protein/carb/fat split; every meal and day shows
   calories, protein, carbs, and fat (MyFitnessPal-style breakdown), scaled
@@ -99,10 +109,11 @@ that runs in any modern browser.
   skippable, Spotify-style wizard: liked
   *and disliked* proteins (tap a protein once to like it, again to say "not
   for me," a third time to clear it) → up to 3 meal styles per meal (or "no
-  preference") → how many people you're cooking for → your all-time go-to
-  meal → whether to track a calorie/macro target (and if so, what it is) →
-  your grocery budget → how many times a week you meal prep each meal, if
-  at all. Likes and dislikes both bias meal selection (dislikes
+  preference") → what appliances you have → how many people you're cooking
+  for → your all-time go-to meal → whether to track a calorie/macro target
+  (and if so, what it is) → your grocery budget → how many times a week
+  you meal prep each meal, if at all. Likes and dislikes both bias meal
+  selection (dislikes
   strongly, but never to a hard ban) without turning into a filter —
   variety is still preserved. Meal styles are the one exception: tap a
   style a second time to cross it off (red, struck through) and it's

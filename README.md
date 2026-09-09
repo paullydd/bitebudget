@@ -171,19 +171,23 @@ that runs in any modern browser.
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
 - **Meal prep** — the last step of onboarding asks "Do you like to meal prep?";
-  say yes and you pick, per meal, how many times a week to batch-cook it
-  (e.g. "Lunch — 4× this week") instead of a one-size-fits-all toggle —
-  the other meals that week still stay fully varied. The same three
-  controls also live in Settings' Advanced section for editing later
-  without re-running the wizard. A "🧺 This Week's Batches" summary (and a
-  matching print guide) shows only the recipes you actually chose to
-  batch — total quantity, servings made, and a storage/reheating note —
-  never a coincidental repeat from ordinary variety-picking. Only recipes
-  that actually hold up as a make-ahead batch are ever auto-picked (bowls,
-  stir-fries, soups — never a wrap/sandwich or salad, which just don't
-  keep for a week), and a 🔀 on each batch card rerolls just that one
-  recipe — every day it repeats on updates together — without touching
-  the rest of the plan.
+  say yes and you pick, per meal (including snacks), how many times a
+  week to batch-cook it (e.g. "Snack — 4× this week" for a batch of
+  protein balls) instead of a one-size-fits-all toggle — the other meals
+  that week still stay fully varied. The same four controls also live in
+  Settings' Advanced section for editing later without re-running the
+  wizard. A "🧺 This Week's Batches" summary (and a matching print guide)
+  shows only the recipes you actually chose to batch — total quantity,
+  servings made, a "📋 How to make this batch" step-by-step guide, and a
+  storage/reheating note — never a coincidental repeat from ordinary
+  variety-picking. Only recipes that actually hold up as a make-ahead
+  batch are ever auto-picked (bowls, stir-fries, and soups for
+  lunch/dinner — never a wrap/sandwich or salad; hard-boiled eggs,
+  protein balls, protein cheesecake bites, and baked chicken bites for
+  snacks — never something like sliced apple that's actively worse a few
+  days old), and a 🔀 on each batch card rerolls just that one recipe —
+  every day it repeats on updates together — without touching the rest of
+  the plan.
 - **Edit Prices** — a "💲 Edit Prices" button in the header opens every
   food's price in one place, grouped by grocery-store section, each shown
   next to its shipped national-average default. Change what you actually

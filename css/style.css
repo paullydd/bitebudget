@@ -650,6 +650,12 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .prep-batch-shuffle-btn:hover { background: var(--hover-bg); }
 .prep-batch-servings { font-size: 0.85rem; color: var(--accent-dark); font-weight: 600; margin-bottom: 8px; }
 .prep-batch-items { font-size: 0.85rem; color: var(--muted); margin: 0 0 10px; padding-left: 18px; }
+.prep-batch-instructions { margin-bottom: 10px; font-size: 0.85rem; }
+.prep-batch-instructions summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+.prep-batch-instructions summary:hover { color: var(--accent-dark); }
+.prep-batch-instructions[open] summary { margin-bottom: 8px; }
+.prep-batch-instructions ol { margin: 0; padding-left: 20px; color: var(--muted); }
+.prep-batch-instructions li + li { margin-top: 4px; }
 .prep-batch-note { font-size: 0.8rem; color: var(--muted); margin: 0; border-top: 1px solid var(--border); padding-top: 8px; }
 .meal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 .meal-card {

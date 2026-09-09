@@ -264,8 +264,14 @@ function estimateLeftoverSurplus(shoppingList) {
 // Styles that don't hold up as a cook-once-eat-all-week batch — a wrap or
 // salad assembled Sunday is soggy/wilted by Wednesday, and a smoothie
 // separates in the fridge. Bowls, stir-fries, and soups portion and reheat
-// fine, so meal prep only ever auto-picks from those by default.
-const PREP_UNFRIENDLY_STYLES = { breakfast: ["smoothie"], lunch: ["wrap_sandwich", "salad"], dinner: ["wrap_sandwich", "salad"] };
+// fine, so meal prep only ever auto-picks from those by default. Snacks
+// don't carry a meal style at all (no bowl/wrap/etc.), so they're tagged
+// "batch" (real cook-or-mix-ahead effort worth batching — protein balls,
+// baked chicken bites, hard-boiled eggs) or "quick" (assembled fresh in
+// under a minute either way, or actively worse a few days old, like
+// sliced apple) in js/meals.js instead — meal prep only ever draws from
+// the "batch" ones.
+const PREP_UNFRIENDLY_STYLES = { breakfast: ["smoothie"], lunch: ["wrap_sandwich", "salad"], dinner: ["wrap_sandwich", "salad"], snack: ["quick"] };
 
 // Merges the prep-unfriendly styles into a slot's excludedMealStyle so
 // pickTemplate's existing hard-filter-with-safety-valve does the work —
@@ -349,7 +355,7 @@ function generatePlan(settings, preferences, pantry = {}) {
 
   const recent = { breakfast: [], lunch: [], dinner: [], snack: [] };
   const prepRemaining = {};
-  ["breakfast", "lunch", "dinner"].forEach(slot => {
+  ["breakfast", "lunch", "dinner", "snack"].forEach(slot => {
     const count = Math.min(days, Math.max(0, (mealPrep && mealPrep[slot]) || 0));
     if (count > 0) {
       const [template] = selectPrepPool(slot, 1, vegetarianOnly, preferences, effectiveMacroSplit);
@@ -412,7 +418,7 @@ function generatePlan(settings, preferences, pantry = {}) {
     summary: {
       totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly,
       servings, trackCalories,
-      mealPrep: mealPrep || { breakfast: 0, lunch: 0, dinner: 0 },
+      mealPrep: mealPrep || { breakfast: 0, lunch: 0, dinner: 0, snack: 0 },
       mealPrepEnabled: Object.keys(prepRemaining).length > 0,
     },
   };

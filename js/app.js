@@ -393,10 +393,12 @@ function prefillOnboarding(prefs) {
   const prepBreakfast = $("#prepBreakfast").value;
   const prepLunch = $("#prepLunch").value;
   const prepDinner = $("#prepDinner").value;
+  const prepSnack = $("#prepSnack").value;
   $("#obPrepBreakfast").value = prepBreakfast;
   $("#obPrepLunch").value = prepLunch;
   $("#obPrepDinner").value = prepDinner;
-  const anyPrep = [prepBreakfast, prepLunch, prepDinner].some(v => Number(v) > 0);
+  $("#obPrepSnack").value = prepSnack;
+  const anyPrep = [prepBreakfast, prepLunch, prepDinner, prepSnack].some(v => Number(v) > 0);
   document.querySelector(`#obMealPrepYesNo .bubble[data-value="${anyPrep ? "yes" : "no"}"]`)
     ?.dispatchEvent(new Event("click", { bubbles: true }));
 
@@ -461,12 +463,13 @@ function syncOnboardingIntoSettings() {
   $("#budgetAmount").value = $("#obBudgetAmount").value;
   applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", period, Number($("#servings").value) || 1);
 
-  // "No" is authoritative — always zero out all three, even if the
+  // "No" is authoritative — always zero out all four, even if the
   // (hidden) selects still hold values from a previous "Yes" answer.
   const prepYes = document.querySelector("#obMealPrepYesNo .bubble.selected")?.dataset.value === "yes";
   $("#prepBreakfast").value = prepYes ? $("#obPrepBreakfast").value : 0;
   $("#prepLunch").value = prepYes ? $("#obPrepLunch").value : 0;
   $("#prepDinner").value = prepYes ? $("#obPrepDinner").value : 0;
+  $("#prepSnack").value = prepYes ? $("#obPrepSnack").value : 0;
 
   checkBudgetFeasibility();
 }
@@ -777,6 +780,7 @@ function readSettings() {
       breakfast: Number($("#prepBreakfast").value),
       lunch: Number($("#prepLunch").value),
       dinner: Number($("#prepDinner").value),
+      snack: Number($("#prepSnack").value),
     },
   };
 }
@@ -795,10 +799,11 @@ function writeSettingsToForm(s) {
   $("#servings").dataset.lastValue = $("#servings").value;
   $("#trackCalories").checked = s.trackCalories !== false;
   toggleCalorieFields($("#trackCalories").checked);
-  const prep = s.mealPrep || { breakfast: 0, lunch: 0, dinner: 0 };
+  const prep = s.mealPrep || { breakfast: 0, lunch: 0, dinner: 0, snack: 0 };
   $("#prepBreakfast").value = prep.breakfast;
   $("#prepLunch").value = prep.lunch;
   $("#prepDinner").value = prep.dinner;
+  $("#prepSnack").value = prep.snack || 0;
 }
 
 function macroTargetGrams(dailyCalories, split) {
@@ -1285,6 +1290,10 @@ function renderPrepBatches(batches) {
       </div>
       <div class="prep-batch-servings">🧺 ${prepBatchServingsLabel(b)} · ${money(b.cost)}</div>
       <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
+      <details class="prep-batch-instructions">
+        <summary>📋 How to make this batch</summary>
+        <ol>${b.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
+      </details>
       <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
     </div>`).join("");
 }

@@ -34,7 +34,7 @@ const BADGES = [
 const SHOPPING_CATEGORY_ORDER = ["Produce", "Protein", "Dairy", "Pantry & Grains"];
 const SLOT_ORDER = ["breakfast", "lunch", "dinner", "snack"];
 const PREP_STORAGE_NOTE = "Store in airtight containers in the fridge up to 4 days, or freeze up to 3 months. Reheat covered until steaming.";
-const WIZARD_TOTAL_STEPS = 8;
+const WIZARD_TOTAL_STEPS = 4;
 // Only appliances that actually change which recipes are available get a
 // bubble — no shortcuts here either: several recipes already mention an
 // air fryer or microwave, but always as an optional alternative to the
@@ -331,12 +331,13 @@ function hideOnboarding() {
 }
 
 function clearBubbleSelections() {
-  document.querySelectorAll(".bubble.selected, .bubble.disliked, .bubble.excluded").forEach(b => b.classList.remove("selected", "disliked", "excluded"));
+  // Scoped to the wizard itself — Signature meal's bubbles now live in
+  // Settings and must survive reopening "🎯 Preferences".
+  document.querySelectorAll("#onboarding .bubble.selected, #onboarding .bubble.disliked, #onboarding .bubble.excluded").forEach(b => b.classList.remove("selected", "disliked", "excluded"));
 }
 
 function prefillOnboarding(prefs) {
   clearBubbleSelections();
-  $("#signatureNote").value = "";
 
   if (prefs) {
     (prefs.proteins || []).forEach(v => {
@@ -363,17 +364,6 @@ function prefillOnboarding(prefs) {
         if (b) b.classList.add("excluded");
       });
     });
-    if (prefs.signature) {
-      if (prefs.signature.slot) {
-        const b = document.querySelector(`#signatureSlot .bubble[data-value="${prefs.signature.slot}"]`);
-        if (b) b.classList.add("selected");
-      }
-      if (prefs.signature.preset) {
-        const b = document.querySelector(`#signaturePreset .bubble[data-value="${prefs.signature.preset}"]`);
-        if (b) b.classList.add("selected");
-      }
-      $("#signatureNote").value = prefs.signature.note || "";
-    }
   }
 
   // Appliance bubbles start selected in the markup, but clearBubbleSelections()
@@ -405,20 +395,6 @@ function prefillOnboarding(prefs) {
   if (periodBtn) periodBtn.classList.add("selected");
   $("#obBudgetAmount").value = $("#budgetAmount").value;
   applyBudgetSliderRange("#obBudgetAmountSlider", "#obBudgetAmount", period, Number($("#obServings").value) || 1);
-
-  // Meal prep isn't part of PREFS_KEY either — same seed-from-Settings
-  // approach, plus setting the Yes/No bubble and reveal state to match.
-  const prepBreakfast = $("#prepBreakfast").value;
-  const prepLunch = $("#prepLunch").value;
-  const prepDinner = $("#prepDinner").value;
-  const prepSnack = $("#prepSnack").value;
-  $("#obPrepBreakfast").value = prepBreakfast;
-  $("#obPrepLunch").value = prepLunch;
-  $("#obPrepDinner").value = prepDinner;
-  $("#obPrepSnack").value = prepSnack;
-  const anyPrep = [prepBreakfast, prepLunch, prepDinner, prepSnack].some(v => Number(v) > 0);
-  document.querySelector(`#obMealPrepYesNo .bubble[data-value="${anyPrep ? "yes" : "no"}"]`)
-    ?.dispatchEvent(new Event("click", { bubbles: true }));
 
   // Most of the state above was just set via classList.add directly
   // (bypassing the click handler that normally keeps aria in sync) — one
@@ -487,15 +463,45 @@ function syncOnboardingIntoSettings() {
   $("#budgetAmount").value = $("#obBudgetAmount").value;
   applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", period, Number($("#servings").value) || 1);
 
-  // "No" is authoritative — always zero out all four, even if the
-  // (hidden) selects still hold values from a previous "Yes" answer.
-  const prepYes = document.querySelector("#obMealPrepYesNo .bubble.selected")?.dataset.value === "yes";
-  $("#prepBreakfast").value = prepYes ? $("#obPrepBreakfast").value : 0;
-  $("#prepLunch").value = prepYes ? $("#obPrepLunch").value : 0;
-  $("#prepDinner").value = prepYes ? $("#obPrepDinner").value : 0;
-  $("#prepSnack").value = prepYes ? $("#obPrepSnack").value : 0;
-
   checkBudgetFeasibility();
+}
+
+// Signature meal now lives only in Settings, not the wizard — merge its
+// current DOM state into PREFS_KEY without clobbering wizard-only fields
+// (proteins, mealStyle, excludedMealStyle, missingAppliances).
+function saveSignaturePreference() {
+  const sigSlotBtn = document.querySelector("#signatureSlot .bubble.selected");
+  const sigPresetBtn = document.querySelector("#signaturePreset .bubble.selected");
+  const note = $("#signatureNote").value.trim();
+  let signature;
+  if (sigSlotBtn || sigPresetBtn || note) {
+    signature = {
+      slot: sigSlotBtn ? sigSlotBtn.dataset.value : null,
+      preset: sigPresetBtn ? sigPresetBtn.dataset.value : null,
+      note,
+    };
+  }
+  const saved = localStorage.getItem(PREFS_KEY);
+  const prefs = saved ? JSON.parse(saved) : {};
+  if (signature) prefs.signature = signature;
+  else delete prefs.signature;
+  localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+}
+
+// Seeds Signature meal's bubbles/note from saved preferences — called once
+// at init, since these fields live in Settings and aren't part of the wizard.
+function seedSignatureFields(prefs) {
+  if (!prefs || !prefs.signature) return;
+  if (prefs.signature.slot) {
+    const b = document.querySelector(`#signatureSlot .bubble[data-value="${prefs.signature.slot}"]`);
+    if (b) b.classList.add("selected");
+  }
+  if (prefs.signature.preset) {
+    const b = document.querySelector(`#signaturePreset .bubble[data-value="${prefs.signature.preset}"]`);
+    if (b) b.classList.add("selected");
+  }
+  $("#signatureNote").value = prefs.signature.note || "";
+  document.querySelectorAll("#signatureSlot .bubble, #signaturePreset .bubble").forEach(updateBubbleAria);
 }
 
 function finishOnboarding() {
@@ -732,12 +738,6 @@ function initOnboarding() {
   $("#obServings").addEventListener("change", () => {
     const period = document.querySelector("#obBudgetPeriod .bubble.selected")?.dataset.value || "weekly";
     scaleBudgetForServings("#obServings", "#obBudgetAmount", "#obBudgetAmountSlider", period);
-  });
-
-  wireBubbleGroup($("#obMealPrepYesNo"), "single");
-  $("#obMealPrepYesNo").addEventListener("click", (e) => {
-    const btn = e.target.closest(".bubble");
-    if (btn) $("#obMealPrepDetails").classList.toggle("hidden", btn.dataset.value !== "yes");
   });
 
   wireBubbleGroup($("#obTrackCaloriesYesNo"), "single");
@@ -1636,6 +1636,7 @@ function init() {
   initFontScale();
   initTheme();
   initOnboarding();
+  seedSignatureFields(loadPreferences());
   applyPriceOverrides();
 
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -1690,6 +1691,7 @@ function init() {
     e.preventDefault();
     const settings = readSettings();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    saveSignaturePreference();
     const result = generatePlan(settings, loadPreferences(), loadPantry());
     localStorage.removeItem(SHOPPING_CHECKED_KEY);
     activeDayNum = 1;

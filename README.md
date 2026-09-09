@@ -106,20 +106,20 @@ that runs in any modern browser.
   (raise the budget to $X, or try Vegetarian only) instead of just red text.
 - **Taste-preference onboarding** — a welcome screen (name, tagline, a
   rotating funny quote, "Get Started" / "Skip setup for now") leads into a
-  skippable, Spotify-style wizard: liked
-  *and disliked* proteins (tap a protein once to like it, again to say "not
-  for me," a third time to clear it) → up to 3 meal styles per meal (or "no
-  preference") → what appliances you have → how many people you're cooking
-  for → your all-time go-to meal → whether to track a calorie/macro target
-  (and if so, what it is) → your grocery budget → how many times a week
-  you meal prep each meal, if at all. Likes and dislikes both bias meal
-  selection (dislikes
-  strongly, but never to a hard ban) without turning into a filter —
-  variety is still preserved. Meal styles are the one exception: tap a
-  style a second time to cross it off (red, struck through) and it's
-  genuinely excluded — e.g. rule out soup for dinner and you'll never get
-  a soup dinner, full stop. Revisit anytime via the "🎯 Preferences" button
-  in the header.
+  skippable, Spotify-style, 4-step wizard: liked *and disliked* proteins
+  (tap a protein once to like it, again to say "not for me," a third time
+  to clear it) plus what appliances you have → up to 3 meal styles per meal
+  (or "no preference") → how many people you're cooking for plus your
+  grocery budget → whether to track a calorie/macro target (and if so, what
+  it is). Likes and dislikes both bias meal selection (dislikes strongly,
+  but never to a hard ban) without turning into a filter — variety is still
+  preserved. Meal styles are the one exception: tap a style a second time
+  to cross it off (red, struck through) and it's genuinely excluded — e.g.
+  rule out soup for dinner and you'll never get a soup dinner, full stop.
+  Revisit anytime via the "🎯 Preferences" button in the header. Two less
+  everyday preferences — your all-time go-to (signature) meal and meal prep
+  — aren't asked during onboarding; they live in Settings → Advanced
+  instead, available from day one but out of the way of the first-run flow.
 - **Log your own meal** — a 📝 button on any meal card lets you swap it for
   something you're actually eating: type a name and protein/carbs/fat (cost
   optional), and the rest of that day's meals automatically recalculate to
@@ -188,13 +188,11 @@ that runs in any modern browser.
 - **Print Full Plan** — a second print button turns the whole week into a
   paginated booklet (every day, every meal, full ingredients and
   instructions) instead of just the shopping list.
-- **Meal prep** — the last step of onboarding asks "Do you like to meal prep?";
-  say yes and you pick, per meal (including snacks), how many times a
-  week to batch-cook it (e.g. "Snack — 4× this week" for a batch of
-  protein balls) instead of a one-size-fits-all toggle — the other meals
-  that week still stay fully varied. The same four controls also live in
-  Settings' Advanced section for editing later without re-running the
-  wizard. A "🧺 This Week's Batches" summary (and a matching print guide)
+- **Meal prep** — in Settings → Advanced, pick, per meal (including snacks),
+  how many times a week to batch-cook it (e.g. "Snack — 4× this week" for a
+  batch of protein balls) instead of a one-size-fits-all toggle — the other
+  meals that week still stay fully varied. A "🧺 This Week's Batches" summary
+  (and a matching print guide)
   shows only the recipes you actually chose to batch — total quantity,
   servings made, a "📋 How to make this batch" step-by-step guide, and a
   storage/reheating note — never a coincidental repeat from ordinary

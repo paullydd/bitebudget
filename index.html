@@ -52,10 +52,10 @@
     </section>
 
     <section id="onboarding" class="panel hidden">
-      <h2>🍽️ What do you like to eat?</h2>
-      <p class="onboarding-intro">A few quick questions — broad first, then more specific, then your all-time go-to, plus your calorie and budget targets. This only nudges variety toward your taste; it never restricts your plan, and you can change it anytime from "Preferences."</p>
+      <h2>🍽️ A few quick questions</h2>
+      <p class="onboarding-intro">Broad first, then more specific. This only nudges variety toward your taste; it never restricts your plan, and you can change any of it anytime from "Preferences" (or Settings, for the rest).</p>
 
-      <div class="wizard-progress" id="wizardProgress">Step 1 of 5</div>
+      <div class="wizard-progress" id="wizardProgress">Step 1 of 4</div>
 
       <div class="wizard-step active" data-step="1">
         <h3>What proteins do you like?</h3>
@@ -67,6 +67,15 @@
           <button type="button" class="bubble" data-value="egg">🥚 Eggs</button>
           <button type="button" class="bubble" data-value="plant">🌱 Plant-based</button>
           <button type="button" class="bubble" data-value="dairy">🧀 Dairy</button>
+        </div>
+
+        <div class="wizard-slot">
+          <div class="wizard-slot-label" id="applianceBubblesLabel">What do you have to cook with?</div>
+          <p class="wizard-hint">Assumed available by default — tap something off if you don't have it.</p>
+          <div class="bubble-group" id="applianceBubbles" role="group" aria-labelledby="applianceBubblesLabel">
+            <button type="button" class="bubble selected" data-value="blender">🌀 Blender</button>
+            <button type="button" class="bubble selected" data-value="slow_cooker">🐢 Slow Cooker</button>
+          </div>
         </div>
       </div>
 
@@ -109,52 +118,28 @@
       </div>
 
       <div class="wizard-step" data-step="3">
-        <h3>What do you have to cook with?</h3>
-        <p class="wizard-hint">Everything here is assumed available by default — tap something off if you don't have it, and recipes that need it are left out of your plan.</p>
-        <div class="bubble-group" id="applianceBubbles">
-          <button type="button" class="bubble selected" data-value="blender">🌀 Blender</button>
-          <button type="button" class="bubble selected" data-value="slow_cooker">🐢 Slow Cooker</button>
-        </div>
-      </div>
-
-      <div class="wizard-step" data-step="4">
-        <h3>How many people are you cooking for?</h3>
-        <p class="wizard-hint">Every recipe's ingredients scale to this — feeding a family of 4 gets you 4x the ingredients, not 4 separate plans.</p>
+        <h3>How many people, and what's your budget?</h3>
+        <p class="wizard-hint">Every recipe's ingredients scale to your household size — a family of 4 gets 4x the ingredients, not 4 separate plans.</p>
         <div class="form-row">
           <label for="obServings">Number of people</label>
           <input type="number" id="obServings" min="1" max="12" value="1">
         </div>
-      </div>
-
-      <div class="wizard-step" data-step="5">
-        <h3>What's a meal you always come back to?</h3>
-        <p class="wizard-hint">Your "favorite song" — pick which meal it's for, then the closest match.</p>
-
         <div class="wizard-slot">
-          <div class="wizard-slot-label" id="signatureSlotLabel">Which meal?</div>
-          <div class="bubble-group" id="signatureSlot" role="group" aria-labelledby="signatureSlotLabel">
-            <button type="button" class="bubble" data-value="breakfast">Breakfast</button>
-            <button type="button" class="bubble" data-value="lunch">Lunch</button>
-            <button type="button" class="bubble" data-value="dinner">Dinner</button>
+          <div class="wizard-slot-label" id="obBudgetPeriodLabel">Grocery budget</div>
+          <p class="wizard-hint">Pick a period, then slide or type an amount.</p>
+          <div class="bubble-group" id="obBudgetPeriod" role="group" aria-labelledby="obBudgetPeriodLabel">
+            <button type="button" class="bubble" data-value="daily">Daily</button>
+            <button type="button" class="bubble selected" data-value="weekly">Weekly</button>
+            <button type="button" class="bubble" data-value="monthly">Monthly</button>
           </div>
-        </div>
-        <div class="wizard-slot">
-          <div class="wizard-slot-label" id="signaturePresetLabel">Closest match</div>
-          <div class="bubble-group" id="signaturePreset" role="group" aria-labelledby="signaturePresetLabel">
-            <button type="button" class="bubble" data-value="eggs_meat">🍳 Eggs &amp; meat</button>
-            <button type="button" class="bubble" data-value="yogurt_oats">🥣 Yogurt or oats</button>
-            <button type="button" class="bubble" data-value="chicken_rice">🍗 Chicken &amp; rice</button>
-            <button type="button" class="bubble" data-value="fish">🐟 Fish</button>
-            <button type="button" class="bubble" data-value="plant_based">🌱 Plant-based</button>
+          <div class="slider-row">
+            <input type="range" id="obBudgetAmountSlider" min="20" max="700" step="5" value="75" aria-label="Budget amount">
+            <input type="number" id="obBudgetAmount" min="20" max="700" step="5" value="75" aria-label="Budget amount (typed)">
           </div>
-        </div>
-        <div class="form-row">
-          <label for="signatureNote">Anything else? (optional)</label>
-          <input type="text" id="signatureNote" placeholder="e.g. my grandma's chicken soup" maxlength="120">
         </div>
       </div>
 
-      <div class="wizard-step" data-step="6">
+      <div class="wizard-step" data-step="4">
         <h3>How are you planning?</h3>
         <p class="wizard-hint">Some people want a calorie/macro target, others just want good meals within budget — both work.</p>
         <div class="bubble-group" id="obTrackCaloriesYesNo">
@@ -168,81 +153,6 @@
               <input type="range" id="obCaloriesSlider" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target">
               <input type="number" id="obCalories" min="1000" max="5000" step="50" value="2000" aria-label="Daily calorie target (typed)">
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="wizard-step" data-step="7">
-        <h3>What's your grocery budget?</h3>
-        <p class="wizard-hint">Pick a period, then slide or type an amount.</p>
-        <div class="bubble-group" id="obBudgetPeriod">
-          <button type="button" class="bubble" data-value="daily">Daily</button>
-          <button type="button" class="bubble selected" data-value="weekly">Weekly</button>
-          <button type="button" class="bubble" data-value="monthly">Monthly</button>
-        </div>
-        <div class="slider-row">
-          <input type="range" id="obBudgetAmountSlider" min="20" max="700" step="5" value="75" aria-label="Budget amount">
-          <input type="number" id="obBudgetAmount" min="20" max="700" step="5" value="75" aria-label="Budget amount (typed)">
-        </div>
-      </div>
-
-      <div class="wizard-step" data-step="8">
-        <h3>Do you like to meal prep?</h3>
-        <p class="wizard-hint">Batch-cook one recipe and eat it a few times instead of something new each day.</p>
-        <div class="bubble-group" id="obMealPrepYesNo">
-          <button type="button" class="bubble selected" data-value="no">No, keep it varied</button>
-          <button type="button" class="bubble" data-value="yes">Yes, I meal prep</button>
-        </div>
-
-        <div id="obMealPrepDetails" class="hidden">
-          <p class="wizard-hint">How many times a week for each meal? Leave at "No meal prep" to skip it.</p>
-          <div class="wizard-slot">
-            <label class="wizard-slot-label" for="obPrepBreakfast">Breakfast</label>
-            <select id="obPrepBreakfast">
-              <option value="0">No meal prep</option>
-              <option value="2">2× this week</option>
-              <option value="3">3× this week</option>
-              <option value="4">4× this week</option>
-              <option value="5">5× this week</option>
-              <option value="6">6× this week</option>
-              <option value="7">7× this week (every day)</option>
-            </select>
-          </div>
-          <div class="wizard-slot">
-            <label class="wizard-slot-label" for="obPrepLunch">Lunch</label>
-            <select id="obPrepLunch">
-              <option value="0">No meal prep</option>
-              <option value="2">2× this week</option>
-              <option value="3">3× this week</option>
-              <option value="4">4× this week</option>
-              <option value="5">5× this week</option>
-              <option value="6">6× this week</option>
-              <option value="7">7× this week (every day)</option>
-            </select>
-          </div>
-          <div class="wizard-slot">
-            <label class="wizard-slot-label" for="obPrepDinner">Dinner</label>
-            <select id="obPrepDinner">
-              <option value="0">No meal prep</option>
-              <option value="2">2× this week</option>
-              <option value="3">3× this week</option>
-              <option value="4">4× this week</option>
-              <option value="5">5× this week</option>
-              <option value="6">6× this week</option>
-              <option value="7">7× this week (every day)</option>
-            </select>
-          </div>
-          <div class="wizard-slot">
-            <label class="wizard-slot-label" for="obPrepSnack">Snack</label>
-            <select id="obPrepSnack">
-              <option value="0">No meal prep</option>
-              <option value="2">2× this week</option>
-              <option value="3">3× this week</option>
-              <option value="4">4× this week</option>
-              <option value="5">5× this week</option>
-              <option value="6">6× this week</option>
-              <option value="7">7× this week (every day)</option>
-            </select>
           </div>
         </div>
       </div>
@@ -338,7 +248,32 @@
             <div class="form-row checkbox-row">
               <label><input type="checkbox" id="vegetarian"> Vegetarian only</label>
             </div>
-            <p class="macro-hint" style="margin-top: 12px;">🧺 Meal prep — repeat one recipe in bigger batches for whichever meals you want, instead of a new recipe most days. Also asked during onboarding ("🎯 Preferences").</p>
+
+            <p class="macro-hint" style="margin-top: 12px;">🍽️ Signature meal — a meal you always come back to. Nudges variety toward it; never restricts your plan.</p>
+            <div class="wizard-slot">
+              <div class="wizard-slot-label" id="signatureSlotLabel">Which meal?</div>
+              <div class="bubble-group" id="signatureSlot" role="group" aria-labelledby="signatureSlotLabel">
+                <button type="button" class="bubble" data-value="breakfast">Breakfast</button>
+                <button type="button" class="bubble" data-value="lunch">Lunch</button>
+                <button type="button" class="bubble" data-value="dinner">Dinner</button>
+              </div>
+            </div>
+            <div class="wizard-slot">
+              <div class="wizard-slot-label" id="signaturePresetLabel">Closest match</div>
+              <div class="bubble-group" id="signaturePreset" role="group" aria-labelledby="signaturePresetLabel">
+                <button type="button" class="bubble" data-value="eggs_meat">🍳 Eggs &amp; meat</button>
+                <button type="button" class="bubble" data-value="yogurt_oats">🥣 Yogurt or oats</button>
+                <button type="button" class="bubble" data-value="chicken_rice">🍗 Chicken &amp; rice</button>
+                <button type="button" class="bubble" data-value="fish">🐟 Fish</button>
+                <button type="button" class="bubble" data-value="plant_based">🌱 Plant-based</button>
+              </div>
+            </div>
+            <div class="form-row">
+              <label for="signatureNote">Anything else? (optional)</label>
+              <input type="text" id="signatureNote" placeholder="e.g. my grandma's chicken soup" maxlength="120">
+            </div>
+
+            <p class="macro-hint" style="margin-top: 12px;">🧺 Meal prep — repeat one recipe in bigger batches for whichever meals you want, instead of a new recipe most days.</p>
             <div class="wizard-slot">
               <label class="wizard-slot-label" for="prepBreakfast">Breakfast</label>
               <select id="prepBreakfast">

@@ -932,6 +932,62 @@ function renderMealCard(meal, dayIndex, mealIndex) {
     </div>`;
 }
 
+// One card per matching template — its own scaled-to-nobody's-target
+// base nutrition/cost (a template's own designed size, same numbers
+// shown before any calorie-target or servings scaling happens), the
+// same ❤️/👎 buttons meal cards use (keyed by template id, so favoriting
+// or ruling out a recipe here does the exact same thing it would from a
+// generated plan), and a "View Recipe" that opens the same cookbook page.
+function renderRecipeBookCard(t) {
+  const n = computeNutrition(t.items);
+  const favorite = isFavorite(t.id);
+  const disliked = isDislikedRecipe(t.id);
+  const time = formatTime(t.prepTime, t.cookTime);
+  return `
+    <div class="meal-card">
+      <div class="meal-head">
+        <span class="meal-icon">${slotIcon(t.slot)}</span>
+        <div class="meal-title">
+          <div class="meal-slot">${t.slot}</div>
+          <div class="meal-name">${t.name}</div>
+        </div>
+        <div class="meal-head-actions">
+          <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${t.id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
+          <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${t.id}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
+          <div class="meal-cost">${money(n.cost)}</div>
+        </div>
+      </div>
+      <div class="meal-macros">
+        <span>${Math.round(n.cal)} kcal</span>
+        <span>P ${grams(n.protein)}</span>
+        <span>C ${grams(n.carbs)}</span>
+        <span>F ${grams(n.fat)}</span>
+        ${time ? `<span>${time}</span>` : ""}
+      </div>
+      <button type="button" class="recipe-book-view-btn" data-template-id="${t.id}">📖 View Recipe</button>
+    </div>`;
+}
+
+function renderRecipeBook() {
+  const search = $("#recipeSearch").value.trim().toLowerCase();
+  const slot = document.querySelector("#recipeSlotFilter .bubble.selected")?.dataset.value || "all";
+  const protein = document.querySelector("#recipeProteinFilter .bubble.selected")?.dataset.value || "all";
+  const vegOnly = $("#recipeVegOnly").checked;
+
+  const matches = MEAL_TEMPLATES.filter(t => {
+    if (slot !== "all" && t.slot !== slot) return false;
+    if (protein !== "all" && !templateProteinFamilies(t).includes(protein)) return false;
+    if (vegOnly && !isVegetarian(t.items)) return false;
+    if (search && !t.name.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  $("#recipeBookCount").textContent = `${matches.length} recipe${matches.length === 1 ? "" : "s"}`;
+  $("#recipeBookList").innerHTML = matches.length
+    ? matches.map(renderRecipeBookCard).join("")
+    : `<p class="history-empty">No recipes match — try a different search or filter.</p>`;
+}
+
 // Builds an FDA-style "Nutrition Facts" box. %DV uses the standard FDA
 // 2,000-calorie reference values (fat 78g, carbohydrate 275g); protein gets
 // no %DV, matching real labels, which don't require one.
@@ -1543,7 +1599,7 @@ function renderHistoryView() {
   $("#historyList").innerHTML = rows;
 }
 
-const SECTION_IDS = { settings: "settingsPanel", week: "resultsWeek", shopping: "resultsShopping" };
+const SECTION_IDS = { settings: "settingsPanel", week: "resultsWeek", shopping: "resultsShopping", recipes: "resultsRecipes" };
 let activeSection = "settings";
 
 // Switches which top-level section is visible — same show/hide-by-id
@@ -1603,6 +1659,32 @@ function init() {
       if (!btn.disabled) showSection(btn.dataset.section);
     });
   });
+
+  // Recipe Book — browsable independent of any generated plan, so it's
+  // wired and rendered here in init() rather than alongside renderPlan().
+  wireBubbleGroup($("#recipeSlotFilter"), "single");
+  wireBubbleGroup($("#recipeProteinFilter"), "single");
+  ["#recipeSlotFilter", "#recipeProteinFilter"].forEach(sel => $(sel).addEventListener("click", renderRecipeBook));
+  $("#recipeSearch").addEventListener("input", renderRecipeBook);
+  $("#recipeVegOnly").addEventListener("change", renderRecipeBook);
+  $("#recipeBookList").addEventListener("click", (e) => {
+    const favoriteBtn = e.target.closest(".favorite-btn");
+    if (favoriteBtn) {
+      toggleFavorite(favoriteBtn.dataset.templateId);
+      return;
+    }
+    const dislikeBtn = e.target.closest(".dislike-btn");
+    if (dislikeBtn) {
+      toggleDislikedRecipe(dislikeBtn.dataset.templateId);
+      return;
+    }
+    const viewBtn = e.target.closest(".recipe-book-view-btn");
+    if (viewBtn) {
+      const t = MEAL_TEMPLATES.find(x => x.id === viewBtn.dataset.templateId);
+      if (t) openRecipeModal({ ...t, nutrition: computeNutrition(t.items) });
+    }
+  });
+  renderRecipeBook();
 
   $("#planForm").addEventListener("submit", (e) => {
     e.preventDefault();

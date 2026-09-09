@@ -691,7 +691,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .pending-meal-card { border-style: dashed; background: transparent; }
 .pending-meal-note { color: var(--muted); font-size: 0.85rem; margin: 10px 0; }
 .pending-meal-card .custom-meal-btn { width: 100%; text-align: center; }
-.recipe-btn {
+.recipe-btn, .recipe-book-view-btn {
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--accent-dark);
@@ -702,7 +702,8 @@ form { display: flex; flex-direction: column; gap: 16px; }
   cursor: pointer;
   width: 100%;
 }
-.recipe-btn:hover { background: var(--hover-bg); }
+.recipe-btn:hover, .recipe-book-view-btn:hover { background: var(--hover-bg); }
+.recipe-book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
 
 /* ---------- Recipe modal: styled like an open cookbook page ---------- */
 .recipe-modal {

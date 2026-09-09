@@ -170,6 +170,13 @@ that runs in any modern browser.
 - **Favorite a recipe** — a ❤️ on any meal (card or recipe page) boosts it
   in future plans, on top of the existing protein-preference system — works
   even if you skipped onboarding entirely.
+- **Recipe Book** — a "📖 Recipes" tab, browsable from the very first visit
+  (it doesn't wait on a generated plan the way Your Week/Shopping List
+  do), lists every recipe in the app with search, a meal filter, a
+  protein filter, and a vegetarian-only toggle. The same ❤️/👎 buttons
+  work right there, so you can shape your preferences — or just rule out
+  a recipe you already know you don't want — before ever generating a
+  plan, not only after one happens to show up in a week.
 - **"Not for me" (👎)** — sitting right next to the favorite button, this is
   real feedback on one specific recipe, not just a taste-profile bias: mark
   a meal you actually made and didn't like, and that exact recipe is

@@ -39,6 +39,7 @@
       <button type="button" class="app-nav-btn" data-section="settings">⚙️ Settings</button>
       <button type="button" class="app-nav-btn" data-section="week" disabled>📅 Your Week</button>
       <button type="button" class="app-nav-btn" data-section="shopping" disabled>🛒 Shopping List</button>
+      <button type="button" class="app-nav-btn" data-section="recipes">📖 Recipes</button>
     </nav>
 
     <section id="welcomeScreen" class="panel welcome-screen">
@@ -425,6 +426,46 @@
         <button type="button" id="printListBtn" class="secondary-btn">🖨️ Print Shopping List</button>
       </div>
       <div id="shoppingList"></div>
+    </section>
+
+    <section id="resultsRecipes" class="panel hidden">
+      <div class="shopping-head">
+        <h2>📖 Recipe Book</h2>
+      </div>
+      <p class="wizard-hint">Every recipe in BiteBudget, browsable on its own — favorite or rule out anything here and it carries into your next plan, no need to wait for it to show up first.</p>
+
+      <div class="form-row">
+        <label for="recipeSearch">Search</label>
+        <input type="search" id="recipeSearch" placeholder="e.g. chicken, bowl, salmon...">
+      </div>
+      <div class="wizard-slot">
+        <div class="wizard-slot-label" id="recipeSlotFilterLabel">Meal</div>
+        <div class="bubble-group" id="recipeSlotFilter" role="group" aria-labelledby="recipeSlotFilterLabel">
+          <button type="button" class="bubble selected" data-value="all">All</button>
+          <button type="button" class="bubble" data-value="breakfast">🌅 Breakfast</button>
+          <button type="button" class="bubble" data-value="lunch">🥗 Lunch</button>
+          <button type="button" class="bubble" data-value="dinner">🍽️ Dinner</button>
+          <button type="button" class="bubble" data-value="snack">🍎 Snack</button>
+        </div>
+      </div>
+      <div class="wizard-slot">
+        <div class="wizard-slot-label" id="recipeProteinFilterLabel">Protein</div>
+        <div class="bubble-group" id="recipeProteinFilter" role="group" aria-labelledby="recipeProteinFilterLabel">
+          <button type="button" class="bubble selected" data-value="all">All</button>
+          <button type="button" class="bubble" data-value="poultry">🍗 Poultry</button>
+          <button type="button" class="bubble" data-value="red_meat">🥩 Red meat</button>
+          <button type="button" class="bubble" data-value="fish">🐟 Fish</button>
+          <button type="button" class="bubble" data-value="plant">🌱 Plant</button>
+          <button type="button" class="bubble" data-value="egg">🥚 Egg</button>
+          <button type="button" class="bubble" data-value="dairy">🧀 Dairy</button>
+        </div>
+      </div>
+      <div class="form-row checkbox-row">
+        <label><input type="checkbox" id="recipeVegOnly"> Vegetarian only</label>
+      </div>
+
+      <p id="recipeBookCount" class="wizard-hint"></p>
+      <div id="recipeBookList" class="recipe-book-grid"></div>
     </section>
   </main>
 

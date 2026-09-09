@@ -11,6 +11,7 @@ const DISLIKED_RECIPES_KEY = "biteBudget.dislikedRecipes.v1";
 const PANTRY_KEY = "biteBudget.pantry.v1";
 const HISTORY_KEY = "biteBudget.history.v1";
 const MY_MEALS_KEY = "biteBudget.myMeals.v1";
+const CUSTOM_RECIPES_KEY = "biteBudget.customRecipes.v1";
 const PRICE_OVERRIDES_KEY = "biteBudget.priceOverrides.v1";
 // Snapshot of FOODS' shipped national-average prices, captured before any
 // override is ever applied — lets the Edit Prices dialog show "(default
@@ -948,10 +949,11 @@ function renderRecipeBookCard(t) {
       <div class="meal-head">
         <span class="meal-icon">${slotIcon(t.slot)}</span>
         <div class="meal-title">
-          <div class="meal-slot">${t.slot}</div>
+          <div class="meal-slot">${t.slot}${t.userRecipe ? ` · <span class="user-recipe-badge">✨ Yours</span>` : ""}</div>
           <div class="meal-name">${t.name}</div>
         </div>
         <div class="meal-head-actions">
+          ${t.userRecipe ? `<button type="button" class="recipe-edit-btn" data-template-id="${t.id}" aria-label="Edit this recipe" title="Edit this recipe">✏️</button>` : ""}
           <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${t.id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
           <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${t.id}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
           <div class="meal-cost">${money(n.cost)}</div>
@@ -986,6 +988,93 @@ function renderRecipeBook() {
   $("#recipeBookList").innerHTML = matches.length
     ? matches.map(renderRecipeBookCard).join("")
     : `<p class="history-empty">No recipes match — try a different search or filter.</p>`;
+}
+
+function loadCustomRecipes() {
+  const saved = localStorage.getItem(CUSTOM_RECIPES_KEY);
+  return saved ? JSON.parse(saved) : [];
+}
+
+function saveCustomRecipes(recipes) {
+  localStorage.setItem(CUSTOM_RECIPES_KEY, JSON.stringify(recipes));
+}
+
+// A user recipe is a real MEAL_TEMPLATES entry (tagged userRecipe: true) so
+// it's picked up automatically everywhere a template already is — the
+// planner's pool, the shopping list, favorites/dislikes, the print
+// booklet — with zero changes to any of that code. Re-run after every
+// add/edit/delete so the current session's pool never goes stale.
+function syncCustomRecipesIntoTemplates() {
+  for (let i = MEAL_TEMPLATES.length - 1; i >= 0; i--) {
+    if (MEAL_TEMPLATES[i].userRecipe) MEAL_TEMPLATES.splice(i, 1);
+  }
+  loadCustomRecipes().forEach(r => MEAL_TEMPLATES.push({ ...r, userRecipe: true }));
+}
+
+// Grouped-by-category <option> list for an ingredient row's food picker —
+// same grouping as the Edit Prices dialog and the shopping list.
+function foodOptionsHTML(selectedFood) {
+  const groups = {};
+  Object.keys(FOODS).forEach(food => {
+    const cat = FOODS[food].category || "Pantry & Grains";
+    (groups[cat] = groups[cat] || []).push(food);
+  });
+  return SHOPPING_CATEGORY_ORDER.filter(cat => groups[cat]).map(cat => {
+    const options = [...groups[cat]].sort((a, b) => FOODS[a].name.localeCompare(FOODS[b].name))
+      .map(food => `<option value="${food}" ${food === selectedFood ? "selected" : ""}>${FOODS[food].name}</option>`).join("");
+    return `<optgroup label="${cat}">${options}</optgroup>`;
+  }).join("");
+}
+
+function customRecipeIngredientRowHTML(food, grams) {
+  const defaultFood = food || Object.keys(FOODS)[0];
+  return `
+    <div class="custom-recipe-ingredient-row">
+      <select class="custom-recipe-food-select" aria-label="Ingredient">${foodOptionsHTML(defaultFood)}</select>
+      <input type="number" class="custom-recipe-grams-input" min="0" step="5" value="${grams != null ? grams : 100}" aria-label="Grams">
+      <span class="unit-label">g</span>
+      <button type="button" class="custom-recipe-remove-ingredient" aria-label="Remove ingredient">✕</button>
+    </div>`;
+}
+
+function readCustomRecipeIngredients() {
+  return [...document.querySelectorAll("#customRecipeIngredients .custom-recipe-ingredient-row")]
+    .map(row => ({
+      food: row.querySelector(".custom-recipe-food-select").value,
+      grams: Math.max(0, Number(row.querySelector(".custom-recipe-grams-input").value) || 0),
+    }))
+    .filter(({ grams }) => grams > 0);
+}
+
+function updateCustomRecipeNutritionPreview() {
+  const items = readCustomRecipeIngredients();
+  const n = items.length ? computeNutrition(items) : { cal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 };
+  $("#customRecipeNutritionPreview").textContent =
+    `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)} · ${money(n.cost)}`;
+  if (items.length) $("#customRecipeError").classList.add("hidden");
+}
+
+let customRecipeEditingId = null;
+
+// `existing` is a saved custom recipe to edit, or null/undefined to create
+// a new one from a blank single-ingredient-row form.
+function openCustomRecipeDialog(existing) {
+  customRecipeEditingId = existing ? existing.id : null;
+  $("#customRecipeTitle").textContent = existing ? "✏️ Edit Your Recipe" : "✨ Add Your Recipe";
+  $("#customRecipeDeleteBtn").classList.toggle("hidden", !existing);
+  $("#customRecipeError").classList.add("hidden");
+  $("#customRecipeName").value = existing ? existing.name : "";
+  $("#customRecipeInstructions").value = existing ? existing.instructions.join("\n") : "";
+
+  const slot = existing ? existing.slot : "breakfast";
+  document.querySelectorAll("#customRecipeSlot .bubble").forEach(b => b.classList.toggle("selected", b.dataset.value === slot));
+  document.querySelectorAll("#customRecipeSlot .bubble").forEach(updateBubbleAria);
+
+  const rows = existing && existing.items.length ? existing.items : [{ food: null, grams: 100 }];
+  $("#customRecipeIngredients").innerHTML = rows.map(i => customRecipeIngredientRowHTML(i.food, i.grams)).join("");
+  updateCustomRecipeNutritionPreview();
+
+  $("#customRecipeDialog").showModal();
 }
 
 // Builds an FDA-style "Nutrition Facts" box. %DV uses the standard FDA
@@ -1408,6 +1497,69 @@ function renderPrintPrepGuide(result) {
   return header + cards;
 }
 
+// Calories and cost per day, side by side across the whole week — each
+// day tab already shows its own totals, but seeing all of them at once is
+// what actually reveals a pattern (e.g. one blown-out day dragging the
+// whole week over budget) that paging through days one at a time hides.
+// Built entirely from day.totals, already computed by recomputeDayTotals —
+// no new planner logic needed.
+function renderWeekDashboard(plan, summary) {
+  if (!plan.length) return "";
+  const trackCalories = summary.trackCalories !== false;
+  const dailyCalories = summary.dailyCalories;
+  const dailyBudget = summary.dailyBudget;
+
+  const maxCal = Math.max(...plan.map(d => d.totals.cal), trackCalories ? dailyCalories : 0, 1);
+  const maxCost = Math.max(...plan.map(d => d.totals.cost), dailyBudget, 1);
+  const calTargetPct = trackCalories ? clamp((dailyCalories / maxCal) * 100, 0, 100) : null;
+  const budgetPct = clamp((dailyBudget / maxCost) * 100, 0, 100);
+
+  const calBars = plan.map(d => `
+    <div class="dashboard-bar-col">
+      <div class="dashboard-bar-value">${Math.round(d.totals.cal)}</div>
+      <div class="dashboard-bar-track">
+        <div class="dashboard-bar-fill" style="height: ${clamp((d.totals.cal / maxCal) * 100, 0, 100)}%"></div>
+        ${trackCalories ? `<div class="dashboard-target-line" style="bottom: ${calTargetPct}%"></div>` : ""}
+      </div>
+      <div class="dashboard-bar-label">Day ${d.day}</div>
+    </div>`).join("");
+
+  const costBars = plan.map(d => {
+    const over = d.totals.cost > dailyBudget * 1.05;
+    return `
+    <div class="dashboard-bar-col">
+      <div class="dashboard-bar-value">${money(d.totals.cost)}</div>
+      <div class="dashboard-bar-track">
+        <div class="dashboard-bar-fill ${over ? "bad" : "good"}" style="height: ${clamp((d.totals.cost / maxCost) * 100, 0, 100)}%"></div>
+        <div class="dashboard-target-line" style="bottom: ${budgetPct}%"></div>
+      </div>
+      <div class="dashboard-bar-label">Day ${d.day}</div>
+    </div>`;
+  }).join("");
+
+  const days = plan.length;
+  const avg = (key) => plan.reduce((s, d) => s + d.totals[key], 0) / days;
+  const avgMeta = trackCalories ? `
+    <div class="meta-item"><div class="label">Avg calories / day</div><div class="value">${Math.round(avg("cal"))} kcal</div></div>
+    <div class="meta-item"><div class="label">Avg macros / day (P/C/F)</div><div class="value">${grams(avg("protein"))} / ${grams(avg("carbs"))} / ${grams(avg("fat"))}</div></div>` : "";
+
+  return `
+    <div class="dashboard-charts">
+      <div class="dashboard-chart">
+        <h4>Calories per day${trackCalories ? ` <span class="muted">(dashed = target)</span>` : ""}</h4>
+        <div class="dashboard-bars">${calBars}</div>
+      </div>
+      <div class="dashboard-chart">
+        <h4>Cost per day <span class="muted">(dashed = daily budget)</span></h4>
+        <div class="dashboard-bars">${costBars}</div>
+      </div>
+    </div>
+    <div class="meta-grid dashboard-averages">
+      <div class="meta-item"><div class="label">Avg cost / day</div><div class="value">${money(avg("cost"))} <span class="muted">/ ${money(dailyBudget)}</span></div></div>
+      ${avgMeta}
+    </div>`;
+}
+
 // Grid: one row per day, one column per meal slot (positional — every day
 // has the same slot sequence since generatePlan's slotsToday is
 // deterministic per settings). Clicking a cell reuses activateDay(), the
@@ -1471,6 +1623,8 @@ function renderPlan(result) {
   if (prepBatches.length > 0) {
     $("#prepBatches").innerHTML = renderPrepBatches(prepBatches);
   }
+
+  $("#weekDashboard").innerHTML = renderWeekDashboard(plan, summary);
 
   $("#weekOverview").innerHTML = renderWeekOverview(plan);
 
@@ -1663,6 +1817,7 @@ function init() {
 
   // Recipe Book — browsable independent of any generated plan, so it's
   // wired and rendered here in init() rather than alongside renderPlan().
+  syncCustomRecipesIntoTemplates();
   wireBubbleGroup($("#recipeSlotFilter"), "single");
   wireBubbleGroup($("#recipeProteinFilter"), "single");
   ["#recipeSlotFilter", "#recipeProteinFilter"].forEach(sel => $(sel).addEventListener("click", renderRecipeBook));
@@ -1679,6 +1834,12 @@ function init() {
       toggleDislikedRecipe(dislikeBtn.dataset.templateId);
       return;
     }
+    const editBtn = e.target.closest(".recipe-edit-btn");
+    if (editBtn) {
+      const recipe = loadCustomRecipes().find(r => r.id === editBtn.dataset.templateId);
+      if (recipe) openCustomRecipeDialog(recipe);
+      return;
+    }
     const viewBtn = e.target.closest(".recipe-book-view-btn");
     if (viewBtn) {
       const t = MEAL_TEMPLATES.find(x => x.id === viewBtn.dataset.templateId);
@@ -1686,6 +1847,58 @@ function init() {
     }
   });
   renderRecipeBook();
+
+  $("#addRecipeBtn").addEventListener("click", () => openCustomRecipeDialog(null));
+  wireBubbleGroup($("#customRecipeSlot"), "single");
+  $("#customRecipeCloseBtn").addEventListener("click", () => $("#customRecipeDialog").close());
+  $("#customRecipeDialog").addEventListener("click", (e) => {
+    if (e.target === $("#customRecipeDialog")) $("#customRecipeDialog").close();
+  });
+  $("#customRecipeAddIngredientBtn").addEventListener("click", () => {
+    $("#customRecipeIngredients").insertAdjacentHTML("beforeend", customRecipeIngredientRowHTML());
+    updateCustomRecipeNutritionPreview();
+  });
+  $("#customRecipeIngredients").addEventListener("click", (e) => {
+    const removeBtn = e.target.closest(".custom-recipe-remove-ingredient");
+    if (!removeBtn) return;
+    const rows = document.querySelectorAll("#customRecipeIngredients .custom-recipe-ingredient-row");
+    if (rows.length > 1) removeBtn.closest(".custom-recipe-ingredient-row").remove();
+    updateCustomRecipeNutritionPreview();
+  });
+  $("#customRecipeIngredients").addEventListener("input", updateCustomRecipeNutritionPreview);
+  $("#customRecipeIngredients").addEventListener("change", updateCustomRecipeNutritionPreview);
+  $("#customRecipeForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const items = readCustomRecipeIngredients();
+    if (!items.length) {
+      $("#customRecipeError").classList.remove("hidden");
+      return;
+    }
+    const name = $("#customRecipeName").value.trim();
+    if (!name) return;
+    const slot = document.querySelector("#customRecipeSlot .bubble.selected")?.dataset.value || "breakfast";
+    const instructions = $("#customRecipeInstructions").value.split("\n").map(s => s.trim()).filter(Boolean);
+    const id = customRecipeEditingId || `custom-recipe-${Date.now()}`;
+    const recipe = { id, slot, name, items, instructions };
+
+    const recipes = loadCustomRecipes();
+    const idx = recipes.findIndex(r => r.id === id);
+    if (idx >= 0) recipes[idx] = recipe; else recipes.push(recipe);
+    saveCustomRecipes(recipes);
+    syncCustomRecipesIntoTemplates();
+
+    $("#customRecipeDialog").close();
+    renderRecipeBook();
+  });
+  $("#customRecipeDeleteBtn").addEventListener("click", () => {
+    if (!customRecipeEditingId) return;
+    const name = $("#customRecipeName").value.trim() || "this recipe";
+    if (!confirm(`Delete "${name}"? This can't be undone.`)) return;
+    saveCustomRecipes(loadCustomRecipes().filter(r => r.id !== customRecipeEditingId));
+    syncCustomRecipesIntoTemplates();
+    $("#customRecipeDialog").close();
+    renderRecipeBook();
+  });
 
   $("#planForm").addEventListener("submit", (e) => {
     e.preventDefault();

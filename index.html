@@ -341,6 +341,9 @@
 
       <div id="planMeta" class="meta-grid"></div>
 
+      <h3>📊 Week Dashboard</h3>
+      <div id="weekDashboard"></div>
+
       <div id="prepBatchesSection" class="hidden">
         <h3>🧺 This Week's Batches</h3>
         <p class="wizard-hint">Cook each of these once, then portion out for the week.</p>
@@ -366,8 +369,9 @@
     <section id="resultsRecipes" class="panel hidden">
       <div class="shopping-head">
         <h2>📖 Recipe Book</h2>
+        <button type="button" id="addRecipeBtn" class="secondary-btn">✨ Add Your Recipe</button>
       </div>
-      <p class="wizard-hint">Every recipe in BiteBudget, browsable on its own — favorite or rule out anything here and it carries into your next plan, no need to wait for it to show up first.</p>
+      <p class="wizard-hint">Every recipe in BiteBudget, browsable on its own — favorite or rule out anything here and it carries into your next plan, no need to wait for it to show up first. Add your own with real ingredients and it can be auto-planned and shopping-listed too, not just logged once.</p>
 
       <div class="form-row">
         <label for="recipeSearch">Search</label>
@@ -466,6 +470,44 @@
           <label><input type="checkbox" id="customMealOpen"> Leave this open — I'll fill it in later</label>
         </div>
         <button type="submit" class="primary-btn">Save</button>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="customRecipeDialog" class="achievements-dialog custom-recipe-dialog">
+    <div class="achievements-page">
+      <button type="button" id="customRecipeCloseBtn" class="recipe-close" aria-label="Close">✕</button>
+      <h2 id="customRecipeTitle">✨ Add Your Recipe</h2>
+      <p class="wizard-hint">Real ingredients, so it can be auto-planned, added to the shopping list, and cooked from — not just a one-off log.</p>
+      <form id="customRecipeForm">
+        <div class="form-row">
+          <label for="customRecipeName">Recipe name</label>
+          <input type="text" id="customRecipeName" placeholder="e.g. Mom's turkey chili" required>
+        </div>
+        <div class="wizard-slot">
+          <div class="wizard-slot-label" id="customRecipeSlotLabel">Meal</div>
+          <div class="bubble-group" id="customRecipeSlot" role="group" aria-labelledby="customRecipeSlotLabel">
+            <button type="button" class="bubble selected" data-value="breakfast">🌅 Breakfast</button>
+            <button type="button" class="bubble" data-value="lunch">🥗 Lunch</button>
+            <button type="button" class="bubble" data-value="dinner">🍽️ Dinner</button>
+            <button type="button" class="bubble" data-value="snack">🍎 Snack</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Ingredients</label>
+          <div id="customRecipeIngredients" class="custom-recipe-ingredients"></div>
+          <button type="button" id="customRecipeAddIngredientBtn" class="secondary-btn">+ Add ingredient</button>
+          <p id="customRecipeError" class="custom-recipe-error hidden">Add at least one ingredient with a quantity above 0g.</p>
+        </div>
+        <p id="customRecipeNutritionPreview" class="macro-hint">0 kcal · P 0g · C 0g · F 0g · $0.00</p>
+        <div class="form-row">
+          <label for="customRecipeInstructions">Instructions (optional, one step per line)</label>
+          <textarea id="customRecipeInstructions" rows="4" placeholder="1. ..."></textarea>
+        </div>
+        <div class="custom-recipe-actions">
+          <button type="button" id="customRecipeDeleteBtn" class="secondary-btn hidden">🗑️ Delete recipe</button>
+          <button type="submit" class="primary-btn">Save Recipe</button>
+        </div>
       </form>
     </div>
   </dialog>

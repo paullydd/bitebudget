@@ -164,6 +164,13 @@ that runs in any modern browser.
 - **Week at a Glance** — a compact grid (days × meal slots) above the day
   tabs shows your whole week's shape at once; click a cell to jump straight
   to that day instead of clicking through tabs one at a time.
+- **Week Dashboard** — bar charts for calories and cost, one bar per day
+  across the whole plan (with a dashed line for your calorie target and
+  daily budget), plus weekly averages for cost, calories, and macros. Paging
+  through day tabs one at a time hides a pattern like one blown-out day
+  dragging the whole week over budget; seeing all the days side by side is
+  what actually reveals it. Built entirely from totals the planner already
+  computes per day — no new tracking.
 - **Nutrition Facts label** — every recipe page includes a real FDA-style
   label (Calories, Total Fat/Carbohydrate with %DV, Protein), deliberately
   monochrome like the label on actual packaging.
@@ -177,6 +184,17 @@ that runs in any modern browser.
   work right there, so you can shape your preferences — or just rule out
   a recipe you already know you don't want — before ever generating a
   plan, not only after one happens to show up in a week.
+- **Add Your Recipe** — a "✨ Add Your Recipe" button in the Recipe Book
+  lets you build a real recipe (name, meal slot, ingredients picked from
+  the same food catalog everything else uses, optional instructions) that
+  behaves exactly like a built-in one: it's eligible for auto-planning,
+  shows up in the shopping list with real ingredient quantities, gets
+  nutrition/cost computed automatically instead of typed in, and can be
+  favorited or printed. Marked with a "✨ Yours" badge and an ✏️ edit
+  button in the Recipe Book. This is different from "Log your own meal" on
+  a day's meal card, which is a quick one-off swap (freehand macros, no
+  ingredients, never re-selected by the planner) for something like eating
+  out where you don't know the exact recipe.
 - **"Not for me" (👎)** — sitting right next to the favorite button, this is
   real feedback on one specific recipe, not just a taste-profile bias: mark
   a meal you actually made and didn't like, and that exact recipe is

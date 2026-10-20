@@ -107,9 +107,17 @@ function weightedPick(candidates, weights) {
 // target does more than nudge among many other signals), then weights the
 // remaining candidates by how well they match stated taste preferences and
 // fine-grained macro fit within that narrowed set.
-function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, macroSplit) {
+function pickTemplate(slot, recentIds, diet, overBudget, preferences, macroSplit) {
   let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
-  if (vegetarianOnly) pool = pool.filter(t => isVegetarian(t.items));
+
+  // Combined restrictions (e.g. vegetarian + gluten-free + dairy-free at
+  // once) could plausibly empty a slot's pool out entirely given how
+  // omnivore-heavy this recipe set is — same safety valve as every other
+  // hard filter below: never let that happen, just skip the filter.
+  if (diet) {
+    const filtered = pool.filter(t => matchesDiet(t.items, diet));
+    if (filtered.length > 0) pool = filtered;
+  }
 
   // Equipment you don't have is a hard constraint, not a taste
   // preference — a recipe that needs a blender or slow cooker is
@@ -185,7 +193,7 @@ function pickTemplate(slot, recentIds, vegetarianOnly, overBudget, preferences, 
 // (or left at its own designed size when calorie tracking is off), times
 // however many people the plan is feeding. Used to warn upfront when a
 // budget can't realistically be met.
-function estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly, trackCalories = true, servings = 1) {
+function estimateMinDailyCost(dailyCalories, snacksPerDay, diet, trackCalories = true, servings = 1) {
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
   const slots = ["breakfast", "lunch", "dinner", ...Array(snacksPerDay).fill("snack")];
@@ -193,7 +201,8 @@ function estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly, track
   let total = 0;
   for (const slot of slots) {
     let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
-    if (vegetarianOnly) pool = pool.filter(t => isVegetarian(t.items));
+    const filtered = pool.filter(t => matchesDiet(t.items, diet));
+    if (filtered.length > 0) pool = filtered;
     const pct = slot === "snack" ? snackPct : slotPct[slot];
     const targetCal = dailyCalories * pct;
 
@@ -304,12 +313,12 @@ function withPrepStyleFilter(preferences, slot) {
 // pick per day. Reuses pickTemplate's full weighting (macro-fit,
 // preferences, budget); each pick feeds the next call's avoid-list so the
 // pool members are distinct, the same trick the day loop already uses.
-function selectPrepPool(slot, count, vegetarianOnly, preferences, macroSplit) {
+function selectPrepPool(slot, count, diet, preferences, macroSplit) {
   const prepPreferences = withPrepStyleFilter(preferences, slot);
   const pool = [];
   const usedIds = [];
   for (let i = 0; i < count; i++) {
-    const template = pickTemplate(slot, usedIds, vegetarianOnly, false, prepPreferences, macroSplit);
+    const template = pickTemplate(slot, usedIds, diet, false, prepPreferences, macroSplit);
     pool.push(template);
     usedIds.push(template.id);
   }
@@ -354,11 +363,12 @@ function groupIntoPrepBatches(plan) {
 function generatePlan(settings, preferences, pantry = {}) {
   const {
     days, dailyCalories, macroSplit, budgetPeriod, budgetAmount,
-    snacksPerDay, vegetarianOnly, mealPrep,
+    snacksPerDay, vegetarianOnly, glutenFree, dairyFree, mealPrep,
   } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
   const effectiveMacroSplit = trackCalories ? macroSplit : null;
+  const diet = { vegetarian: vegetarianOnly, glutenFree, dairyFree };
 
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
@@ -369,7 +379,7 @@ function generatePlan(settings, preferences, pantry = {}) {
   ["breakfast", "lunch", "dinner", "snack"].forEach(slot => {
     const count = Math.min(days, Math.max(0, (mealPrep && mealPrep[slot]) || 0));
     if (count > 0) {
-      const [template] = selectPrepPool(slot, 1, vegetarianOnly, preferences, effectiveMacroSplit);
+      const [template] = selectPrepPool(slot, 1, diet, preferences, effectiveMacroSplit);
       prepRemaining[slot] = { template, remaining: count };
     }
   });
@@ -394,7 +404,7 @@ function generatePlan(settings, preferences, pantry = {}) {
         prep.remaining--;
         prepped = true;
       } else {
-        template = pickTemplate(slot, recent[slot], vegetarianOnly, overBudgetSoFar, preferences, effectiveMacroSplit);
+        template = pickTemplate(slot, recent[slot], diet, overBudgetSoFar, preferences, effectiveMacroSplit);
       }
 
       const base = computeNutrition(template.items);
@@ -428,6 +438,7 @@ function generatePlan(settings, preferences, pantry = {}) {
     plan, shoppingList,
     summary: {
       totalCost, totalBudget, dailyBudget, dailyCalories, macroSplit, days, snacksPerDay, vegetarianOnly,
+      glutenFree, dairyFree,
       servings, trackCalories,
       mealPrep: mealPrep || { breakfast: 0, lunch: 0, dinner: 0, snack: 0 },
       mealPrepEnabled: Object.keys(prepRemaining).length > 0,
@@ -440,10 +451,11 @@ function generatePlan(settings, preferences, pantry = {}) {
 // used during initial generation, so preference weighting, dislikes, and
 // budget-awareness all apply identically to a manual swap.
 function regenerateMeal(result, dayIndex, mealIndex, settings, preferences, pantry = {}) {
-  const { dailyCalories, macroSplit, snacksPerDay, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const { dailyCalories, macroSplit, snacksPerDay, vegetarianOnly, glutenFree, dairyFree, budgetPeriod, budgetAmount } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
   const effectiveMacroSplit = trackCalories ? macroSplit : null;
+  const diet = { vegetarian: vegetarianOnly, glutenFree, dairyFree };
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, snacksPerDay);
@@ -459,7 +471,7 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences, pant
   avoidIds.push(oldMeal.id);
 
   const overBudget = day.totals.cost > dailyBudget;
-  const template = pickTemplate(slot, avoidIds, vegetarianOnly, overBudget, preferences, effectiveMacroSplit);
+  const template = pickTemplate(slot, avoidIds, diet, overBudget, preferences, effectiveMacroSplit);
 
   const base = computeNutrition(template.items);
   const factor = computeFactor(base, targetCal, trackCalories);
@@ -486,10 +498,11 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences, pant
 // same every day) so the new pick is scaled once and reused everywhere,
 // exactly like the initial batch pick in generatePlan.
 function regeneratePrepBatch(result, batchId, settings, preferences, pantry = {}) {
-  const { dailyCalories, macroSplit, vegetarianOnly } = settings;
+  const { dailyCalories, macroSplit, vegetarianOnly, glutenFree, dairyFree } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
   const effectiveMacroSplit = trackCalories ? macroSplit : null;
+  const diet = { vegetarian: vegetarianOnly, glutenFree, dairyFree };
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
 
   let slot = null;
@@ -502,7 +515,7 @@ function regeneratePrepBatch(result, batchId, settings, preferences, pantry = {}
 
   const targetCal = dailyCalories * slotPct[slot];
   const prepPreferences = withPrepStyleFilter(preferences, slot);
-  const template = pickTemplate(slot, [batchId], vegetarianOnly, false, prepPreferences, effectiveMacroSplit);
+  const template = pickTemplate(slot, [batchId], diet, false, prepPreferences, effectiveMacroSplit);
 
   const base = computeNutrition(template.items);
   const factor = computeFactor(base, targetCal, trackCalories);
@@ -553,10 +566,11 @@ function recomputeAllCosts(result, pantry = {}) {
 // still aims for the same target around the fixed meal — custom/pending
 // meals elsewhere in the day are left untouched either way.
 function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, preferences, rebalance, pantry = {}) {
-  const { dailyCalories, macroSplit, vegetarianOnly, budgetPeriod, budgetAmount } = settings;
+  const { dailyCalories, macroSplit, vegetarianOnly, glutenFree, dairyFree, budgetPeriod, budgetAmount } = settings;
   const trackCalories = settings.trackCalories !== false;
   const servings = settings.servings || 1;
   const effectiveMacroSplit = trackCalories ? macroSplit : null;
+  const diet = { vegetarian: vegetarianOnly, glutenFree, dairyFree };
   const dailyBudget = dailyBudgetFor(budgetPeriod, budgetAmount);
   const slotPct = { breakfast: 0.25, lunch: 0.30, dinner: 0.35 };
   const snackPct = 0.10 / Math.max(1, settings.snacksPerDay);
@@ -580,7 +594,7 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
       const avoidIds = nearbyDays.flatMap(d => d.meals.filter(mm => mm.slot === m.slot && !mm.custom).map(mm => mm.id));
       avoidIds.push(m.id);
 
-      const template = pickTemplate(m.slot, avoidIds, vegetarianOnly, overBudget, preferences, effectiveMacroSplit);
+      const template = pickTemplate(m.slot, avoidIds, diet, overBudget, preferences, effectiveMacroSplit);
       const base = computeNutrition(template.items);
       const factor = computeFactor(base, targetCal, trackCalories);
       const personItems = scaleItems(template.items, factor);

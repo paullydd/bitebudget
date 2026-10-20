@@ -86,8 +86,17 @@ that runs in any modern browser.
   "+ Add," and nothing in the pantry is ever removed automatically either
   — regenerating, shuffling, or swapping a meal never touches it, only
   you do, once you've actually used something up.
-- **Vegetarian filter** and a "shuffle" button to regenerate with more
-  variety without changing your settings.
+- **Dietary filters** — Vegetarian, Gluten-free, and Dairy-free toggles in
+  Settings → Advanced (and mirrored in the Recipe Book for browsing) are
+  independent and stack — picking all three narrows the planner to only
+  recipes matching every one, same hard-filter-with-safety-valve mechanism
+  as appliance/style filtering, so a combination that would otherwise empty
+  a meal slot out just skips that filter rather than breaking planning.
+  Every food is tagged based on its typical grocery version (e.g. plain soy
+  sauce, not tamari) — a helpful default, not a verified source, so always
+  check the actual label for a real allergy or celiac-level restriction.
+  A "shuffle" button regenerates with more variety without changing your
+  settings.
 - **Adjustable text size** — A−/A+ controls in the header scale the whole
   UI (90%–140%), remembered across visits, for readability across ages.
 - **Accessible to screen readers and keyboard users** — one heading per

@@ -800,6 +800,8 @@ function readSettings() {
     budgetAmount: Number($("#budgetAmount").value),
     snacksPerDay: Number($("#snacks").value),
     vegetarianOnly: $("#vegetarian").checked,
+    glutenFree: $("#glutenFree").checked,
+    dairyFree: $("#dairyFree").checked,
     servings: Number($("#servings").value) || 1,
     trackCalories: $("#trackCalories").checked,
     mealPrep: {
@@ -821,6 +823,8 @@ function writeSettingsToForm(s) {
   $("#budgetAmount").value = s.budgetAmount;
   $("#snacks").value = s.snacksPerDay;
   $("#vegetarian").checked = s.vegetarianOnly;
+  $("#glutenFree").checked = !!s.glutenFree;
+  $("#dairyFree").checked = !!s.dairyFree;
   $("#servings").value = s.servings || 1;
   $("#servings").dataset.lastValue = $("#servings").value;
   $("#trackCalories").checked = s.trackCalories !== false;
@@ -860,16 +864,16 @@ function toggleCalorieFields(tracking) {
 function checkBudgetFeasibility() {
   const dailyCalories = Number($("#calories").value) || 0;
   const snacksPerDay = Number($("#snacks").value) || 1;
-  const vegetarianOnly = $("#vegetarian").checked;
+  const diet = { vegetarian: $("#vegetarian").checked, glutenFree: $("#glutenFree").checked, dairyFree: $("#dairyFree").checked };
   const trackCalories = $("#trackCalories").checked;
   const servings = Number($("#servings").value) || 1;
   const dailyBudget = dailyBudgetFor($("#budgetPeriod").value, Number($("#budgetAmount").value) || 0);
-  const minDailyCost = estimateMinDailyCost(dailyCalories, snacksPerDay, vegetarianOnly, trackCalories, servings);
+  const minDailyCost = estimateMinDailyCost(dailyCalories, snacksPerDay, diet, trackCalories, servings);
 
   const banner = $("#budgetWarning");
   if (dailyBudget < minDailyCost) {
     const forWhom = trackCalories ? "at this calorie target" : servings > 1 ? `for ${servings} people` : "for the cheapest meals";
-    const fix = trackCalories ? "raising your budget, lowering calories, or turning on Vegetarian only" : "raising your budget or turning on Vegetarian only";
+    const fix = trackCalories ? "raising your budget, lowering calories, or loosening a dietary filter" : "raising your budget or loosening a dietary filter";
     banner.innerHTML = `⚠️ ${money(dailyBudget)}/day may not cover even the cheapest meals ${forWhom} (~${money(minDailyCost)}/day minimum). Try ${fix}.`;
     banner.classList.remove("hidden");
   } else {
@@ -974,12 +978,12 @@ function renderRecipeBook() {
   const search = $("#recipeSearch").value.trim().toLowerCase();
   const slot = document.querySelector("#recipeSlotFilter .bubble.selected")?.dataset.value || "all";
   const protein = document.querySelector("#recipeProteinFilter .bubble.selected")?.dataset.value || "all";
-  const vegOnly = $("#recipeVegOnly").checked;
+  const diet = { vegetarian: $("#recipeVegOnly").checked, glutenFree: $("#recipeGlutenFree").checked, dairyFree: $("#recipeDairyFree").checked };
 
   const matches = MEAL_TEMPLATES.filter(t => {
     if (slot !== "all" && t.slot !== slot) return false;
     if (protein !== "all" && !templateProteinFamilies(t).includes(protein)) return false;
-    if (vegOnly && !isVegetarian(t.items)) return false;
+    if (!matchesDiet(t.items, diet)) return false;
     if (search && !t.name.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -1248,7 +1252,7 @@ function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost, t
   const budgetClass = overBudget ? "bad" : "good";
   const calDiff = t.cal - dailyCalories;
   const suggestion = overBudget && dailyBudget < minDailyCost
-    ? `<div class="budget-suggestion">Try raising your budget to ~${money(minDailyCost)}/day or turning on Vegetarian only.</div>`
+    ? `<div class="budget-suggestion">Try raising your budget to ~${money(minDailyCost)}/day, or loosening a dietary filter.</div>`
     : "";
   const calValue = trackCalories
     ? `${Math.round(t.cal)} <span class="muted">/ ${dailyCalories} target (${calDiff >= 0 ? "+" : ""}${Math.round(calDiff)})</span>`
@@ -1597,10 +1601,11 @@ function renderPlan(result) {
   const trackCalories = summary.trackCalories !== false;
   const servings = summary.servings || 1;
   const targets = macroTargetGrams(summary.dailyCalories, summary.macroSplit);
-  const minDailyCost = estimateMinDailyCost(summary.dailyCalories, summary.snacksPerDay, summary.vegetarianOnly, trackCalories, servings);
+  const summaryDiet = { vegetarian: summary.vegetarianOnly, glutenFree: summary.glutenFree, dairyFree: summary.dairyFree };
+  const minDailyCost = estimateMinDailyCost(summary.dailyCalories, summary.snacksPerDay, summaryDiet, trackCalories, servings);
   const totalOverBudget = summary.totalCost > summary.totalBudget * 1.02;
   const totalSuggestion = totalOverBudget && summary.dailyBudget < minDailyCost
-    ? `<div class="budget-suggestion">${money(summary.totalCost - summary.totalBudget)} over — try raising your budget to ~${money(minDailyCost * summary.days)} or turning on Vegetarian only.</div>`
+    ? `<div class="budget-suggestion">${money(summary.totalCost - summary.totalBudget)} over — try raising your budget to ~${money(minDailyCost * summary.days)}, or loosening a dietary filter.</div>`
     : "";
 
   const targetMeta = trackCalories ? `
@@ -1822,7 +1827,7 @@ function init() {
   wireBubbleGroup($("#recipeProteinFilter"), "single");
   ["#recipeSlotFilter", "#recipeProteinFilter"].forEach(sel => $(sel).addEventListener("click", renderRecipeBook));
   $("#recipeSearch").addEventListener("input", renderRecipeBook);
-  $("#recipeVegOnly").addEventListener("change", renderRecipeBook);
+  ["#recipeVegOnly", "#recipeGlutenFree", "#recipeDairyFree"].forEach(sel => $(sel).addEventListener("change", renderRecipeBook));
   $("#recipeBookList").addEventListener("click", (e) => {
     const favoriteBtn = e.target.closest(".favorite-btn");
     if (favoriteBtn) {
@@ -2180,7 +2185,7 @@ function init() {
     scaleBudgetForServings("#servings", "#budgetAmount", "#budgetAmountSlider", $("#budgetPeriod").value);
   });
 
-  ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian", "#servings", "#trackCalories"].forEach(sel => {
+  ["#calories", "#budgetPeriod", "#budgetAmount", "#snacks", "#vegetarian", "#glutenFree", "#dairyFree", "#servings", "#trackCalories"].forEach(sel => {
     $(sel).addEventListener("input", checkBudgetFeasibility);
     $(sel).addEventListener("change", checkBudgetFeasibility);
   });

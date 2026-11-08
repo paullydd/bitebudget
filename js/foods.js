@@ -100,6 +100,18 @@ const FOODS = {
   protein_pasta:   { name: "Protein Pasta (cooked)", protein: 20, carbs: 45,  fat: 2.5,  price: 0.64, veg: true, glutenFree: false, dairyFree: true,  category: "Pantry & Grains" },
   steak:           { name: "Steak",               protein: 27,   carbs: 0,    fat: 12,   price: 1.90, veg: false, glutenFree: true,  dairyFree: true,  category: "Protein", proteinFamily: "red_meat" },
   cod:             { name: "Cod",                 protein: 18,   carbs: 0,    fat: 0.9,  price: 1.15, veg: false, glutenFree: true,  dairyFree: true,  category: "Protein", proteinFamily: "fish" },
+  // Added for pasted recipes. Raw ground chicken, kept separate from Chicken Breast
+  // (cooked); dry orzo separate from cooked Pasta; regular milk separate from Almond Milk.
+  ground_chicken:  { name: "Ground Chicken",      protein: 17.4, carbs: 0,    fat: 8.1,  price: 0.95, veg: false, glutenFree: true,  dairyFree: true,  category: "Protein", proteinFamily: "poultry" },
+  breadcrumbs:     { name: "Breadcrumbs",         protein: 13.4, carbs: 72,   fat: 5.3,  price: 0.55, veg: true, glutenFree: false, dairyFree: true,  category: "Pantry & Grains" },
+  milk:            { name: "Milk",                protein: 3.4,  carbs: 4.8,  fat: 3.3,  price: 0.10, veg: true, glutenFree: true,  dairyFree: false, category: "Dairy" },
+  heavy_cream:     { name: "Heavy Cream",         protein: 2.1,  carbs: 2.8,  fat: 36,   price: 0.70, veg: true, glutenFree: true,  dairyFree: false, category: "Dairy" },
+  light_cream:     { name: "Light Cream (half & half)", protein: 3, carbs: 4.3, fat: 11.5, price: 0.35, veg: true, glutenFree: true,  dairyFree: false, category: "Dairy" },
+  orzo:            { name: "Orzo (dry)",          protein: 13,   carbs: 74,   fat: 1.5,  price: 0.30, veg: true, glutenFree: false, dairyFree: true,  category: "Pantry & Grains" },
+  chicken_broth:   { name: "Chicken Broth",       protein: 1,    carbs: 0.4,  fat: 0.3,  price: 0.25, veg: false, glutenFree: true,  dairyFree: true,  category: "Pantry & Grains" },
+  vegetable_oil:   { name: "Vegetable Oil",       protein: 0,    carbs: 0,    fat: 100,  price: 0.35, veg: true, glutenFree: true,  dairyFree: true,  category: "Pantry & Grains" },
+  garlic:          { name: "Garlic",              protein: 6.4,  carbs: 33,   fat: 0.5,  price: 0.90, veg: true, glutenFree: true,  dairyFree: true,  category: "Produce" },
+  parsley:         { name: "Fresh Parsley",       protein: 3,    carbs: 6.3,  fat: 0.8,  price: 1.00, veg: true, glutenFree: true,  dairyFree: true,  category: "Produce" },
 };
 
 // Compute nutrition + cost for a list of { food, grams } scaled from per-100g values.
@@ -237,6 +249,18 @@ const SERVING_UNITS = {
   protein_pasta:    { unit: "cup", grams: 140 },
   steak:            { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
   cod:              { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
+  ground_chicken:   { unit: "oz",   grams: 28.35, round: 0.5, noPlural: true },
+  breadcrumbs:      { unit: "cup",  grams: 110 },
+  milk:             { unit: "cup",  grams: 244 },
+  heavy_cream:      { unit: "cup",  grams: 238 },
+  light_cream:      { unit: "cup",  grams: 242 },
+  orzo:             { unit: "cup",  grams: 185 },
+  chicken_broth:    { unit: "cup",  grams: 240 },
+  vegetable_oil:    { unit: "tbsp", grams: 14, noPlural: true },
+  // A garlic clove is about 3 g and a teaspoon of minced garlic about 2.8 g.
+  // `extra` lists the other units a food can be entered in beyond its natural one.
+  garlic:           { unit: "clove", grams: 3, round: 0.5, extra: [{ key: "tsp", label: "tsp", grams: 2.8 }, { key: "tbsp", label: "tbsp", grams: 8.4 }] },
+  parsley:          { unit: "cup",  grams: 60 },
 };
 
 // Renders a fraction as a whole number plus a unicode glyph (1¼, ½, 2¾, ...)
@@ -343,6 +367,7 @@ function kitchenUnitOptions(food) {
     } else if (su.unit !== "oz") {
       opts.push({ key: su.unit, label: su.unit, grams: su.grams });
     }
+    for (const e of su.extra || []) if (!opts.some(o => o.key === e.key)) opts.push(e);
   }
   return opts;
 }

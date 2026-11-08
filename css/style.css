@@ -1230,3 +1230,5 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
 .booklet-reference { margin-top: 8px; font-size: 0.9em; }
 .booklet-reference ul { margin: 4px 0 0 18px; padding: 0; color: var(--muted); }
 .booklet-ref-note { color: var(--muted); font-size: 0.85em; }
+
+.rv-group-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-dark); padding: 6px 2px 0; }

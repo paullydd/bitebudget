@@ -1650,7 +1650,7 @@ function pasteRowStatus(row) {
 }
 
 function pasteRowFromLine(line) {
-  const row = { original: line.original, auto: line.kind, keep: line.kind === "seasoning", food: null, grams: null, amount: null, unitKey: null, suggestions: [], reason: "" };
+  const row = { original: line.original, group: line.group || "", auto: line.kind, keep: line.kind === "seasoning", food: null, grams: null, amount: null, unitKey: null, suggestions: [], reason: "" };
   if (line.kind === "ready") {
     row.food = line.food; row.grams = line.grams; row.unitKey = line.unitKey;
     const opt = reviewUnitOptions(row.food).find(o => o.key === row.unitKey);
@@ -1725,6 +1725,18 @@ function pasteRowHTML(row, i, status) {
   </li>`;
 }
 
+// <li> rows for a list of row indexes, with a heading each time the recipe's
+// own group ("Chicken Meatballs") changes.
+function pasteListHTML(indexes, status) {
+  let last = "";
+  return indexes.map(i => {
+    const row = pasteState.rows[i];
+    const head = row.group && row.group !== last ? `<li class="rv-group-label" aria-hidden="true">${escapeHtml(row.group)}</li>` : "";
+    last = row.group || last;
+    return head + pasteRowHTML(row, i, status);
+  }).join("");
+}
+
 function renderPasteReview() {
   const st = pasteState;
   const status = st.rows.map(pasteRowStatus);
@@ -1734,7 +1746,7 @@ function renderPasteReview() {
     <h2 id="pasteReviewTitle">Review your recipe</h2>
     <div class="rv-basics">
       <label class="rv-field rv-field-title">Name
-        <input type="text" id="pasteName" value="${escapeHtml(st.title)}" maxlength="120" placeholder="Recipe name">
+        <input type="text" id="pasteName" value="${escapeHtml(st.title)}" maxlength="120" placeholder="Recipe name (not found in your text)">${st.title.trim() ? "" : `<span class="rv-hint">No title found in your text. Type one to save.</span>`}
       </label>
       <div class="rv-field">Meal
         <div class="bubble-group" id="pasteSlot" role="group" aria-label="Meal">${PASTE_SLOTS.map(([v, l]) => `<button type="button" class="bubble${st.slot === v ? " selected" : ""}" data-value="${v}" aria-pressed="${st.slot === v}">${l}</button>`).join("")}</div>
@@ -1747,12 +1759,12 @@ function renderPasteReview() {
     <div id="pasteSummary" class="rv-summary" aria-live="polite"></div>
     ${pending.length ? `<section class="rv-section rv-needs" aria-labelledby="rvNeedsH"><h3 id="rvNeedsH">Needs review (${pending.length})</h3>
       <p class="wizard-hint">Only these lines need you. Pick a match, or keep the line as written for cooking reference.</p>
-      <ul class="rv-list">${pending.map(i => pasteRowHTML(st.rows[i], i, "pending")).join("")}</ul>
+      <ul class="rv-list">${pasteListHTML(pending, "pending")}</ul>
       ${pending.length > 1 ? `<button type="button" id="pasteKeepAllBtn" class="secondary-btn">Keep all ${pending.length} as written</button>` : ""}</section>` : ""}
     <section class="rv-section" aria-labelledby="rvReadyH"><h3 id="rvReadyH">Ingredients for your shopping list (${use.length})</h3>
-      ${use.length ? `<ul class="rv-list">${use.map(i => pasteRowHTML(st.rows[i], i, "use")).join("")}</ul>` : `<p class="wizard-hint">None yet.</p>`}</section>
+      ${use.length ? `<ul class="rv-list">${pasteListHTML(use, "use")}</ul>` : `<p class="wizard-hint">None yet.</p>`}</section>
     ${keep.length ? `<details class="rv-section rv-kept"><summary>Kept as written, not on your shopping list (${keep.length})</summary>
-      <ul class="rv-list">${keep.map(i => pasteRowHTML(st.rows[i], i, "keep")).join("")}</ul></details>` : ""}
+      <ul class="rv-list">${pasteListHTML(keep, "keep")}</ul></details>` : ""}
     <section class="rv-section"><h3>Instructions</h3>
       <textarea id="pasteInstructions" rows="6" placeholder="Steps, one per line">${escapeHtml(st.instructions)}</textarea></section>
     <details class="rv-section rv-original"><summary>Your original text (kept with the recipe)</summary>

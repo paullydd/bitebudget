@@ -229,7 +229,13 @@ that runs in any modern browser.
   accurately. **Save as draft** is always one click. Quantities are never
   guessed (an unsized can, "1 medium onion" or "2-3 cloves" asks you) and no
   line is dropped: salt, pepper and spices the catalog doesn't track are
-  kept as reference text. Your original text is saved with the recipe, and
+  kept as reference text. Text copied from a recipe site is cleaned first
+  (checkbox bullets, Markdown links, signup forms, ads, `1x2x3x` multipliers,
+  unit-switch links; ingredient and step groups are kept), and a weight
+  written on the line (`1 pound ground chicken, (454 grams)`) is used instead
+  of a cup or pound conversion. A genuinely ambiguous line like "2 tablespoons
+  oil" or "⅔ cup cream" keeps its amount and only asks which type. Your
+  original text is saved with the recipe, and
   lines you keep as written appear under "Also in this recipe". It does not
   read links or screenshots.
 - **My Recipes (personal cookbook)** — a tab inside the Recipe Book for

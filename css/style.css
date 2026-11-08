@@ -68,14 +68,6 @@ body {
   line-height: 1.5;
 }
 
-.app-header {
-  padding: 32px 24px 20px;
-  text-align: center;
-}
-.app-header h1 { margin: 0 0 6px; font-size: 1.8rem; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.logo-mark { width: 1.3em; height: 1.3em; flex: 0 0 auto; }
-.app-header p { margin: 0; color: var(--muted); }
-
 /* ---------- Progress strip ---------- */
 .progress-strip {
   max-width: 960px;
@@ -355,15 +347,6 @@ body {
 .pantry-remove-btn:hover { background: var(--hover-bg); color: var(--bad); }
 .pantry-empty { text-align: center; color: var(--muted); padding: 16px 0; }
 
-.header-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
 .text-size-toggle {
   display: flex;
   align-items: center;
@@ -476,9 +459,10 @@ body {
 
 /* ---------- Slider + number controls ---------- */
 .slider-row { display: flex; align-items: center; gap: 12px; }
-.slider-row input[type="number"] { width: 6em; flex: 0 0 auto; }
+.slider-row input[type="number"] { width: 5.5em; min-width: 0; flex: 0 0 auto; }
 .slider-row input[type="range"] {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   height: 6px;
   border-radius: 999px;
   background: var(--border);
@@ -524,12 +508,12 @@ body {
 .budget-suggestion { font-size: 0.8rem; color: var(--bad); margin-top: 4px; }
 
 main {
-  max-width: 960px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 0 20px 60px;
+  padding: 20px 20px 60px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 .panel {
@@ -539,6 +523,7 @@ main {
   padding: 24px;
 }
 .panel h2 { margin-top: 0; }
+main > .panel { min-width: 0; scroll-margin-top: 76px; }
 .hidden { display: none; }
 .print-booklet { display: none; }
 
@@ -670,33 +655,31 @@ form { display: flex; flex-direction: column; gap: 16px; }
 }
 .day-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
 
-.app-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-  padding-bottom: 16px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--border);
-}
-.app-nav-btn {
+.empty-state { padding-block: 36px; }
+.empty-state p { color: var(--muted); }
+.plan-disclosure {
+  margin: 16px 0;
+  padding: 10px 14px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  padding: 10px 18px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--muted);
+  background: var(--panel-alt);
+  border-radius: 10px;
 }
-.app-nav-btn:hover:not(:disabled) { background: var(--hover-bg); }
-.app-nav-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-.app-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.plan-disclosure summary { font-weight: 650; cursor: pointer; }
+.plan-disclosure[open] summary { margin-bottom: 12px; }
+#resultsWeek .progress-strip, #resultsWeek .plan-nudge { max-width: none; }
+#resultsWeek .progress-strip { margin: 16px 0 0; }
+
+@media (max-width: 640px) {
+  main { padding-inline: 10px; gap: 10px; }
+  main > .panel { padding: 16px; }
+  .settings-section { padding-inline: 12px; }
+  .slider-row { gap: 8px; }
+}
 
 .day-view { display: none; }
 .day-view.active { display: block; }
 
-.dashboard-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin: 4px 0 14px; }
+.dashboard-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; margin: 4px 0 14px; }
 .dashboard-chart h4 { margin: 0 0 10px; font-size: 0.95rem; }
 .dashboard-chart h4 .muted { font-size: 0.78rem; font-weight: 400; }
 .dashboard-bars { display: flex; align-items: flex-end; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
@@ -710,7 +693,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .dashboard-bar-label { font-size: 0.68rem; color: var(--muted); }
 .dashboard-averages { margin: 0 0 20px; }
 
-.prep-batches-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.prep-batches-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; margin-bottom: 24px; }
 .prep-batch-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--panel-alt); }
 .prep-batch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .prep-batch-slot { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
@@ -735,22 +718,19 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .prep-batch-instructions ol { margin: 0; padding-left: 20px; color: var(--muted); }
 .prep-batch-instructions li + li { margin-top: 4px; }
 .prep-batch-note { font-size: 0.8rem; color: var(--muted); margin: 0; border-top: 1px solid var(--border); padding-top: 8px; }
-.meal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.meal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; }
 .meal-card {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
   background: var(--panel-alt);
 }
-.meal-head { display: flex; align-items: flex-start; gap: 10px; }
+.meal-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
 .meal-icon { font-size: 1.4rem; }
-.meal-title { flex: 1 1 auto; min-width: 0; }
+.meal-title { flex: 1 1 10rem; min-width: 0; overflow-wrap: anywhere; }
 .meal-slot { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.03em; }
 .meal-name { font-weight: 700; }
-/* Buttons + price move as one unit that never shrinks below its own
-   content — the title above is what gives way (wrapping its text) so this
-   group can never get pushed past the card's edge, however long the name. */
-.meal-head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+.meal-head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-inline-start: auto; min-width: 0; }
 .meal-cost { font-weight: 700; color: var(--accent-dark); }
 .meal-swap-btn, .favorite-btn, .dislike-btn, .custom-meal-btn {
   border: 1px solid var(--border);
@@ -786,7 +766,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
   width: 100%;
 }
 .recipe-btn:hover, .recipe-book-view-btn:hover { background: var(--hover-bg); }
-.recipe-book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+.recipe-book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 14px; margin-top: 14px; }
 
 /* ---------- Recipe modal: styled like an open cookbook page ---------- */
 .recipe-modal {
@@ -956,6 +936,7 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
     --muted: #6b7268;
     --border: #e4e1d8;
   }
+  body.print-shopping-list .app-sidebar,
   body.print-shopping-list .app-header,
   body.print-shopping-list #progressStrip,
   body.print-shopping-list #appNav,
@@ -1052,7 +1033,7 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
 
 /* ---- What can I make? ---- */
 .wcim-controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;margin:8px 0 12px}
-.wcim-field{display:flex;flex-direction:column;gap:4px;font-size:.9rem;font-weight:600}
+.wcim-field{display:flex;flex-direction:column;gap:4px;font-size:.9rem;font-weight:600;min-width:0;max-width:100%}
 .wcim-field input,.wcim-field select{font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:inherit;max-width:100%}
 .wcim-field input{width:6rem}
 .wcim-pantry{border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin:0 0 12px}
@@ -1082,3 +1063,170 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
 .pantry-confirm-unit{width:auto;font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:inherit}
 .pantry-confirm-btn{font:inherit;font-size:.85rem;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--panel-alt);color:var(--accent-dark);font-weight:600;cursor:pointer}
 .pantry-confirm-btn:hover{background:var(--hover-bg)}
+
+
+/* ================= App shell: sidebar (desktop) / top + bottom bars (phone) =================
+   A left sidebar costs ~220px of width but none of the height, and the weekly plan
+   and recipe screens are tall and scroll vertically, so the sidebar leaves them the
+   most usable room. A top bar would permanently take height on every screen. */
+.app-shell { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
+.app-shell:has(#appNav.hidden) { grid-template-columns: minmax(0, 1fr); }
+.app-shell:has(#appNav.hidden) .app-sidebar { position: static; height: auto; border-right: 0; flex-direction: row; justify-content: space-between; align-items: center; }
+.app-shell:has(#appNav.hidden) .app-header p { display: none; }
+.app-sidebar {
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 18px 12px 14px;
+  background: var(--panel); border-right: 1px solid var(--border);
+}
+.app-content { min-width: 0; }
+.app-header { padding: 2px 6px 8px; }
+.app-brand h1 { margin: 0; font-size: 1.3rem; display: flex; align-items: center; gap: 8px; }
+.logo-mark { width: 1.3em; height: 1.3em; flex: 0 0 auto; }
+.app-brand p { margin: 4px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.35; }
+.app-nav { display: flex; flex-direction: column; gap: 4px; }
+.app-nav.hidden { display: none; }
+.app-nav-btn {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px;
+  padding: 8px 12px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--muted); cursor: pointer; font: inherit; font-size: 0.95rem; font-weight: 650;
+  line-height: 1.2; text-align: left; width: 100%;
+}
+.app-nav-btn:hover { background: var(--hover-bg); color: var(--ink); }
+.app-nav-btn.active { background: var(--accent-dark); color: #fff; }
+.app-nav-btn.parent-active:not(.active) { background: var(--hover-bg); color: var(--ink); box-shadow: inset 3px 0 0 var(--accent); }
+.app-nav-btn:focus-visible, .app-tools summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.nav-icon { font-size: 1.15rem; width: 1.5em; text-align: center; flex: 0 0 auto; }
+.app-nav-secondary { margin-top: 8px; border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; padding-top: 10px; font-weight: 600; font-size: 0.88rem; }
+.app-tools { margin-top: auto; position: relative; }
+.app-tools summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 8px 12px; border-radius: 10px; font-weight: 650; font-size: 0.9rem;
+  background: var(--panel-alt); border: 1px solid var(--border);
+}
+.app-tools summary::-webkit-details-marker { display: none; }
+.app-tools[open] summary { background: var(--hover-bg); }
+.app-tools-panel { display: flex; flex-direction: column; gap: 12px; padding: 12px 4px 4px; }
+.app-tools-group { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.app-tools-group h2 { margin: 0 0 2px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.app-tools-group .text-link-btn { padding: 6px 2px; text-align: left; }
+.app-tools-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+@media (min-width: 900px) {
+  /* App Tools sits at the bottom of the sidebar; its panel opens upward so it never
+     pushes the nav off-screen. */
+  .app-tools[open] { position: relative; }
+  .app-tools[open] .app-tools-panel { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px #0003; padding: 12px; }
+}
+
+@media (max-width: 899px) {
+  .app-shell, .app-shell:has(#appNav.hidden) { display: block; }
+  .app-sidebar, .app-shell:has(#appNav.hidden) .app-sidebar {
+    position: sticky; top: 0; z-index: 20; height: auto; overflow: visible;
+    flex-direction: row; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top));
+    border-right: 0; border-bottom: 1px solid var(--border);
+  }
+  .app-header { padding: 0; }
+  .app-brand h1 { font-size: 1.15rem; }
+  .app-brand p { display: none; }
+  .app-tools { margin-top: 0; }
+  .app-tools summary { min-height: 40px; padding: 6px 12px; }
+  .app-tools[open] .app-tools-panel {
+    position: absolute; top: calc(100% + 8px); right: 0; width: min(300px, calc(100vw - 24px));
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 10px 28px #0004; padding: 14px; max-height: calc(100vh - 90px); overflow-y: auto;
+  }
+  .app-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    flex-direction: row; gap: 0; padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 14px #0001;
+  }
+  .app-nav-btn { flex: 1 1 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 54px; padding: 4px 2px; text-align: center; font-size: 0.72rem; border-radius: 10px; }
+  .app-nav-btn.parent-active:not(.active) { box-shadow: none; }
+  .nav-icon { font-size: 1.25rem; width: auto; }
+  .nav-label { white-space: nowrap; }
+  .app-nav-secondary { display: none; }
+  /* The tab bar is fixed, so every screen gets room beneath its last button. */
+  .app-content { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  main { padding-bottom: 20px; }
+  main > .panel { scroll-margin-top: 70px; }
+  .app-shell:has(#appNav.hidden) .app-content { padding-bottom: 0; }
+  dialog { scroll-padding-bottom: 80px; }
+}
+
+.recipe-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.paste-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; margin-bottom: 16px; background: var(--panel-alt); border: 1px dashed var(--accent); border-radius: var(--radius); }
+.paste-cta p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.paste-cta-btn { font-size: 1.05rem; padding: 12px 22px; }
+.recipe-reference { margin-top: 14px; }
+.recipe-reference ul { color: var(--muted); }
+
+/* ---------- Paste Recipe dialog ---------- */
+.paste-dialog { border: 0; border-radius: 14px; padding: 0; width: min(760px, 96vw); max-height: 92vh; box-shadow: 0 24px 64px rgba(0,0,0,.4); background: var(--panel); color: var(--ink); }
+.paste-dialog::backdrop { background: rgba(15,15,10,.65); }
+.paste-page { position: relative; padding: 24px 24px 0; max-height: 92vh; overflow-y: auto; }
+.paste-page h2 { margin: 0 0 8px; padding-right: 36px; }
+.paste-text { width: 100%; min-height: 46vh; resize: vertical; padding: 14px; font: inherit; font-size: 1rem; line-height: 1.5; background: var(--panel-alt); color: var(--ink); border: 2px solid var(--border); border-radius: 12px; }
+.paste-text:focus { outline: none; border-color: var(--accent); }
+.paste-link { margin: 10px 0; }
+.paste-link summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+.paste-link input { width: 100%; margin-top: 8px; }
+.paste-actions { position: sticky; bottom: 0; display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 0 16px; background: var(--panel); }
+.paste-actions .primary-btn { flex: 1 1 200px; }
+.rv-basics { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 10px 0; }
+.rv-field { display: flex; flex-direction: column; gap: 4px; font-weight: 650; font-size: 0.9rem; }
+.rv-field input[type=text], .rv-field input[type=number] { font-weight: 400; }
+.rv-field input[type=number] { max-width: 120px; }
+.rv-hint { font-weight: 400; color: var(--muted); font-size: 0.8rem; }
+.rv-summary { padding: 12px 14px; margin: 8px 0 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-alt); }
+.rv-counts { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.92rem; }
+.rv-warn { color: var(--warning-text); }
+.rv-blockers { margin: 10px 0 2px; color: var(--warning-text); }
+.rv-summary ul { margin: 4px 0 4px 18px; padding: 0; }
+.rv-ok { margin: 10px 0 0; color: var(--good); font-weight: 650; }
+.rv-section { margin: 16px 0; }
+.rv-section h3 { margin: 0 0 6px; font-size: 1.02rem; }
+.rv-needs { padding: 12px; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 12px; }
+.rv-list { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.rv-name { flex: 1 1 220px; min-width: 0; }
+.rv-orig { color: var(--muted); font-size: 0.88rem; overflow-wrap: anywhere; }
+.rv-reason { display: block; color: var(--warning-text); font-size: 0.82rem; }
+.rv-badge { display: inline-block; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; font-weight: 650; white-space: nowrap; }
+.rv-badge.shop { background: #dff1e6; color: #1f5c38; }
+.rv-badge.ref { background: var(--hover-bg); color: var(--muted); }
+.rv-qty, .rv-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rv-pick { flex: 1 1 100%; }
+.rv-suggest { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.85rem; }
+.rv-amount { width: 90px; }
+.rv-unit, .rv-food { max-width: 100%; }
+.rv-need { color: var(--bad); font-size: 0.82rem; }
+.rv-suggest-btn, .rv-keep-btn, .rv-use-btn { border: 1px solid var(--border); background: var(--panel-alt); color: var(--accent-dark); border-radius: 8px; padding: 8px 12px; min-height: 40px; cursor: pointer; font: inherit; font-size: 0.85rem; font-weight: 600; }
+.rv-suggest-btn { border-color: var(--accent); }
+.rv-suggest-btn:hover, .rv-keep-btn:hover, .rv-use-btn:hover { background: var(--hover-bg); }
+.rv-keep-btn { color: var(--muted); }
+.rv-kept summary { cursor: pointer; font-weight: 650; }
+#pasteInstructions { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-alt); color: var(--ink); }
+.rv-original summary { cursor: pointer; font-weight: 650; }
+.rv-original-text { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font: inherit; font-size: 0.88rem; max-height: 260px; overflow-y: auto; }
+.rv-footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 12px 0 16px; background: var(--panel); border-top: 1px solid var(--border); }
+.rv-footer .text-link-btn { margin-right: auto; }
+.rv-footer .primary-btn:disabled { opacity: .45; cursor: not-allowed; }
+@media (min-width: 640px) { .rv-basics { grid-template-columns: 1fr auto auto; align-items: start; } .rv-field-title { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .paste-page { padding: 16px 14px 0; } .rv-footer .primary-btn, .rv-footer .secondary-btn { flex: 1 1 140px; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rv-badge.shop { background: #1d3a25; color: #9fe0b0; } }
+:root[data-theme="dark"] .rv-badge.shop { background: #1d3a25; color: #9fe0b0; }
+
+.rv-field input, .rv-row input, .rv-row select, .paste-link input { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-alt); color: var(--ink); font: inherit; font-size: 0.95rem; min-height: 40px; }
+.rv-summary .rv-hint { display: none; }
+.rv-summary ul { margin-bottom: 0; }
+.rv-blockers { margin-top: 8px; }
+.rv-row > *, .rv-pick > * { min-width: 0; }
+.rv-food { width: 100%; max-width: 100%; text-overflow: ellipsis; }
+.rv-pick .rv-qty { flex: 1 1 100%; }
+
+.booklet-reference { margin-top: 8px; font-size: 0.9em; }
+.booklet-reference ul { margin: 4px 0 0 18px; padding: 0; color: var(--muted); }
+.booklet-ref-note { color: var(--muted); font-size: 0.85em; }

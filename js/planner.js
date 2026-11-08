@@ -412,7 +412,7 @@ function groupIntoPrepBatches(plan) {
     day.meals.forEach(m => {
       if (!m.prepped) return;
       if (!groups[m.id]) {
-        groups[m.id] = { id: m.id, name: m.name, slot: m.slot, instructions: m.instructions, occurrences: 0, itemTotals: {}, cost: 0, servings: m.servings || 1 };
+        groups[m.id] = { id: m.id, name: m.name, slot: m.slot, instructions: m.instructions, reference: m.reference, occurrences: 0, itemTotals: {}, cost: 0, servings: m.servings || 1 };
       }
       const g = groups[m.id];
       g.occurrences++;
@@ -424,7 +424,7 @@ function groupIntoPrepBatches(plan) {
   });
   return Object.values(groups)
     .map(g => ({
-      id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, occurrences: g.occurrences, cost: g.cost, servings: g.servings,
+      id: g.id, name: g.name, slot: g.slot, instructions: g.instructions, ...(g.reference ? { reference: g.reference } : {}), occurrences: g.occurrences, cost: g.cost, servings: g.servings,
       items: Object.entries(g.itemTotals).map(([food, grams]) => ({ food, grams })),
     }));
 }
@@ -537,7 +537,7 @@ function generatePlan(settings, preferences, pantry = {}) {
       const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
 
       dayMeals.push({
-        slot, id: template.id, name: template.name, items, instructions: template.instructions,
+        slot, id: template.id, name: template.name, items, instructions: template.instructions, ...(Array.isArray(template.reference) && template.reference.length ? { reference: template.reference } : {}),
         nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
         servings,
         prepTime: template.prepTime, cookTime: template.cookTime, prepped,
@@ -615,7 +615,7 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences, pant
   const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
 
   day.meals[mealIndex] = {
-    slot, id: template.id, name: template.name, items, instructions: template.instructions,
+    slot, id: template.id, name: template.name, items, instructions: template.instructions, ...(Array.isArray(template.reference) && template.reference.length ? { reference: template.reference } : {}),
     nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
     servings,
     prepTime: template.prepTime, cookTime: template.cookTime,
@@ -666,7 +666,7 @@ function regeneratePrepBatch(result, batchId, settings, preferences, pantry = {}
     day.meals.forEach((m, i) => {
       if (!m.prepped || m.id !== batchId) return;
       day.meals[i] = {
-        slot, id: template.id, name: template.name, items, instructions: template.instructions,
+        slot, id: template.id, name: template.name, items, instructions: template.instructions, ...(Array.isArray(template.reference) && template.reference.length ? { reference: template.reference } : {}),
         nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
         servings, prepTime: template.prepTime, cookTime: template.cookTime, prepped: true,
       };
@@ -763,7 +763,7 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
       const personNutrition = computeNutrition(personItems);
       const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
       day.meals[i] = {
-        slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions,
+        slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions, ...(Array.isArray(template.reference) && template.reference.length ? { reference: template.reference } : {}),
         nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
         servings,
         prepTime: template.prepTime, cookTime: template.cookTime,
@@ -797,7 +797,7 @@ function placeRecipeInPlan(result, dayIndex, mealIndex, template, servings, pant
   const items = template.items.map(({ food, grams }) => ({ food, grams: grams * factor }));
   const n = computeNutrition(items);
   day.meals[mealIndex] = {
-    slot: target.slot, id: template.id, name: template.name, items, instructions: template.instructions,
+    slot: target.slot, id: template.id, name: template.name, items, instructions: template.instructions, ...(Array.isArray(template.reference) && template.reference.length ? { reference: template.reference } : {}),
     nutrition: { cal: n.cal / portions, protein: n.protein / portions, carbs: n.carbs / portions, fat: n.fat / portions, cost: n.cost },
     servings: portions,
     prepTime: template.prepTime, cookTime: template.cookTime,

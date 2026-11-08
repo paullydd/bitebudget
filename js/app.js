@@ -163,6 +163,12 @@ function validateImportedRecipe(r, takenIds) {
     const lines = r.unmatched.filter(l => typeof l === "string" && l.trim());
     if (lines.length) extra.unmatched = lines;
   }
+  // Lines the person chose to keep as written (shown on the recipe, never on
+  // the shopping list). Rendered as text only.
+  if (Array.isArray(r.reference)) {
+    const lines = r.reference.filter(l => typeof l === "string" && l.trim());
+    if (lines.length) extra.reference = lines;
+  }
 
   takenIds.add(r.id);
   // Same key order the recipe editor writes (orderedRecipeRecord), so a
@@ -359,8 +365,10 @@ function validateImportedPlanMeal(m) {
   const instructions = cleanInstructionSteps(m.instructions);
   if (!instructions) return null;
   const n = computeNutrition(items);
+  const reference = Array.isArray(m.reference) ? m.reference.filter(l => typeof l === "string" && l.trim()) : [];
   return {
     slot: m.slot, id: m.id, name: m.name, items, instructions, servings,
+    ...(reference.length ? { reference } : {}),
     nutrition: { cal: n.cal / servings, protein: n.protein / servings, carbs: n.carbs / servings, fat: n.fat / servings, cost: n.cost },
     prepTime: isFiniteNumber(m.prepTime) ? m.prepTime : null,
     cookTime: isFiniteNumber(m.cookTime) ? m.cookTime : null,
@@ -767,6 +775,7 @@ function showOnboarding() {
   $("#onboarding").classList.remove("hidden");
   $("#appNav").classList.add("hidden");
   Object.values(SECTION_IDS).forEach(id => $(`#${id}`).classList.add("hidden"));
+  $("#noPlanPanel").classList.add("hidden");
 }
 
 function hideOnboarding() {
@@ -1627,6 +1636,321 @@ function wireWhatCanIMake() {
   });
 }
 
+// ---- Paste Recipe: paste -> one review screen -> save
+// State for the review. Each row is one ingredient line from the pasted text:
+//   auto   how the parser read it: "ready" | "seasoning" | "review"
+//   food/grams/amount/unitKey   what it would be on the shopping list
+//   keep   true = the person chose to keep the line as written
+let pasteState = null;
+const PASTE_SLOTS = [["breakfast", "🌅 Breakfast"], ["lunch", "🥗 Lunch"], ["dinner", "🍽️ Dinner"], ["snack", "🍎 Snack"]];
+
+function pasteRowStatus(row) {
+  if (row.keep) return "keep";
+  return row.food && row.grams > 0 ? "use" : "pending";
+}
+
+function pasteRowFromLine(line) {
+  const row = { original: line.original, auto: line.kind, keep: line.kind === "seasoning", food: null, grams: null, amount: null, unitKey: null, suggestions: [], reason: "" };
+  if (line.kind === "ready") {
+    row.food = line.food; row.grams = line.grams; row.unitKey = line.unitKey;
+    const opt = reviewUnitOptions(row.food).find(o => o.key === row.unitKey);
+    row.amount = opt ? Math.round(row.grams / opt.grams * 100) / 100 : Math.round(row.grams * 100) / 100;
+    if (!opt) row.unitKey = "g";
+  } else if (line.kind === "review") {
+    row.suggestions = line.suggestions; row.reason = line.reason;
+    row.amount = line.amount; row.unitKey = line.unitKey;
+  }
+  return row;
+}
+
+// Gives a row a food (the suggestion or a pick) and works out its grams from
+// the amount as written, when that amount converts for this food. Otherwise
+// grams stay null and the row asks for a unit — never a guess.
+function pasteAssignFood(row, food) {
+  row.food = food || null;
+  row.keep = false;
+  if (!food) { row.grams = null; return; }
+  // A bare count ("1 can", "1 medium onion") has no weight we can trust, so it
+  // never converts on its own: the row asks for a unit instead.
+  let key = row.unitKey;
+  if (!reviewUnitOptions(food).some(o => o.key === key) && key !== "kg") key = null;
+  row.unitKey = key;
+  row.grams = row.amount > 0 && key ? gramsForAmount(food, row.amount, key) : null;
+}
+
+function pasteBlockers(st) {
+  const out = [];
+  const pending = st.rows.filter(r => pasteRowStatus(r) === "pending").length;
+  if (!st.title.trim()) out.push("Give the recipe a name");
+  if (!(st.servings >= 1 && st.servings <= RECIPE_YIELD_MAX && Number.isInteger(st.servings))) out.push("Enter how many servings it makes");
+  if (!st.rows.some(r => pasteRowStatus(r) === "use")) out.push("Add at least one ingredient with an amount");
+  if (pending) out.push(`Decide on ${pending} ingredient line${pending === 1 ? "" : "s"}: match a food or keep as written`);
+  return out;
+}
+
+function pasteRowAmountHTML(row, i) {
+  const options = row.food ? reviewUnitOptions(row.food) : [];
+  const unitSel = row.food
+    ? `<select class="rv-unit" data-i="${i}" aria-label="Unit">${row.unitKey ? "" : `<option value="" selected>unit…</option>`}${options.map(o => `<option value="${escapeHtml(o.key)}"${o.key === row.unitKey ? " selected" : ""}>${escapeHtml(o.label)}</option>`).join("")}</select>`
+    : "";
+  return `<span class="rv-qty"><input type="number" class="rv-amount" data-i="${i}" min="0" step="any" value="${row.amount != null ? row.amount : ""}" placeholder="amount" aria-label="Amount of ${escapeHtml(row.food ? FOODS[row.food].name : "ingredient")}">${unitSel}</span>`;
+}
+
+function pasteRowHTML(row, i, status) {
+  const orig = `<span class="rv-orig">“${escapeHtml(row.original)}”</span>`;
+  if (status === "use") {
+    return `<li class="rv-row rv-use" data-i="${i}">
+      <span class="rv-name"><strong>${escapeHtml(FOODS[row.food].name)}</strong> <span class="rv-badge shop">🛒 Shopping list</span></span>
+      ${pasteRowAmountHTML(row, i)}
+      ${orig}
+      <button type="button" class="rv-keep-btn" data-i="${i}">Keep as written</button>
+    </li>`;
+  }
+  if (status === "keep") {
+    return `<li class="rv-row rv-keep" data-i="${i}">
+      <span class="rv-name">${orig} <span class="rv-badge ref">📝 Reference only${row.auto === "seasoning" ? " · seasoning" : ""}</span></span>
+      <button type="button" class="rv-use-btn" data-i="${i}">Use as an ingredient…</button>
+    </li>`;
+  }
+  const sugg = row.suggestions.length
+    ? `<span class="rv-suggest">Suggested: ${row.suggestions.map(f => `<button type="button" class="rv-suggest-btn" data-i="${i}" data-food="${escapeHtml(f)}">Use ${escapeHtml(FOODS[f].name)}</button>`).join(" ")}</span>`
+    : "";
+  const pick = `<select class="rv-food" data-i="${i}" aria-label="Choose the food for “${escapeHtml(row.original)}”"><option value="">Other food…</option>${foodOptionsHTML(row.food)}</select>`;
+  const need = row.food && !(row.grams > 0) ? `<span class="rv-need">${row.amount > 0 ? "Choose a unit" : "Enter an amount"}</span>` : "";
+  return `<li class="rv-row rv-pending" data-i="${i}">
+    <span class="rv-name">${orig} <span class="rv-reason">${escapeHtml(row.reason || "Needs a decision")}</span></span>
+    ${sugg}
+    <span class="rv-pick">${pick}${row.food ? pasteRowAmountHTML(row, i) : ""}${need}</span>
+    <button type="button" class="rv-keep-btn" data-i="${i}">Keep as written</button>
+  </li>`;
+}
+
+function renderPasteReview() {
+  const st = pasteState;
+  const status = st.rows.map(pasteRowStatus);
+  const idx = (k) => st.rows.map((r, i) => i).filter(i => status[i] === k);
+  const pending = idx("pending"), use = idx("use"), keep = idx("keep");
+  $("#pasteStepReview").innerHTML = `
+    <h2 id="pasteReviewTitle">Review your recipe</h2>
+    <div class="rv-basics">
+      <label class="rv-field rv-field-title">Name
+        <input type="text" id="pasteName" value="${escapeHtml(st.title)}" maxlength="120" placeholder="Recipe name">
+      </label>
+      <div class="rv-field">Meal
+        <div class="bubble-group" id="pasteSlot" role="group" aria-label="Meal">${PASTE_SLOTS.map(([v, l]) => `<button type="button" class="bubble${st.slot === v ? " selected" : ""}" data-value="${v}" aria-pressed="${st.slot === v}">${l}</button>`).join("")}</div>
+      </div>
+      <label class="rv-field">Servings it makes
+        <input type="number" id="pasteServings" min="1" max="${RECIPE_YIELD_MAX}" step="1" value="${st.servings || ""}" placeholder="?">
+        <span class="rv-hint">${st.servingsFound ? "Found in your text" : "Not found in your text — enter it so amounts plan correctly"}</span>
+      </label>
+    </div>
+    <div id="pasteSummary" class="rv-summary" aria-live="polite"></div>
+    ${pending.length ? `<section class="rv-section rv-needs" aria-labelledby="rvNeedsH"><h3 id="rvNeedsH">Needs review (${pending.length})</h3>
+      <p class="wizard-hint">Only these lines need you. Pick a match, or keep the line as written for cooking reference.</p>
+      <ul class="rv-list">${pending.map(i => pasteRowHTML(st.rows[i], i, "pending")).join("")}</ul>
+      ${pending.length > 1 ? `<button type="button" id="pasteKeepAllBtn" class="secondary-btn">Keep all ${pending.length} as written</button>` : ""}</section>` : ""}
+    <section class="rv-section" aria-labelledby="rvReadyH"><h3 id="rvReadyH">Ingredients for your shopping list (${use.length})</h3>
+      ${use.length ? `<ul class="rv-list">${use.map(i => pasteRowHTML(st.rows[i], i, "use")).join("")}</ul>` : `<p class="wizard-hint">None yet.</p>`}</section>
+    ${keep.length ? `<details class="rv-section rv-kept"><summary>Kept as written, not on your shopping list (${keep.length})</summary>
+      <ul class="rv-list">${keep.map(i => pasteRowHTML(st.rows[i], i, "keep")).join("")}</ul></details>` : ""}
+    <section class="rv-section"><h3>Instructions</h3>
+      <textarea id="pasteInstructions" rows="6" placeholder="Steps, one per line">${escapeHtml(st.instructions)}</textarea></section>
+    <details class="rv-section rv-original"><summary>Your original text (kept with the recipe)</summary>
+      <pre class="rv-original-text">${escapeHtml(st.text)}</pre></details>
+    <p id="pasteReviewError" class="form-error hidden" role="alert"></p>
+    <div class="rv-footer">
+      <button type="button" id="pasteBackBtn" class="text-link-btn">← Edit text</button>
+      <button type="button" id="pasteSaveDraftBtn" class="secondary-btn">Save as draft</button>
+      <button type="button" id="pasteSaveBtn" class="primary-btn">Save recipe</button>
+    </div>`;
+  updatePasteSummary();
+}
+
+// Summary + button state only, so typing never re-renders (and loses focus).
+function updatePasteSummary() {
+  const st = pasteState;
+  const status = st.rows.map(pasteRowStatus);
+  const count = (k) => status.filter(x => x === k).length;
+  const blockers = pasteBlockers(st);
+  $("#pasteSummary").innerHTML = `
+    <div class="rv-counts"><span><strong>${count("use")}</strong> on your shopping list</span><span><strong>${count("keep")}</strong> kept as written</span><span class="${count("pending") ? "rv-warn" : ""}"><strong>${count("pending")}</strong> need a decision</span></div>
+    ${blockers.length
+      ? `<p class="rv-blockers"><strong>Before this can be planned accurately:</strong></p><ul>${blockers.map(b => `<li>${escapeHtml(b)}</li>`).join("")}</ul>`
+      : `<p class="rv-ok">✅ Ready to plan: ingredients, amounts and servings are confirmed.</p>`}`;
+  $("#pasteSaveBtn").disabled = blockers.length > 0;
+}
+
+function pasteSyncFromFields() {
+  const st = pasteState;
+  const name = $("#pasteName"), serv = $("#pasteServings"), ins = $("#pasteInstructions");
+  if (name) st.title = name.value;
+  if (serv) { const n = Number(serv.value); st.servings = serv.value.trim() === "" ? null : n; }
+  if (ins) st.instructions = ins.value;
+}
+
+function openPasteDialog() {
+  pasteState = null;
+  $("#pasteText").value = "";
+  $("#pasteLink").value = "";
+  $("#pasteInputNote").classList.add("hidden");
+  $("#pasteStepInput").classList.remove("hidden");
+  $("#pasteStepReview").classList.add("hidden");
+  $("#pasteReviewBtn").disabled = true;
+  $("#pasteSaveRawBtn").disabled = true;
+  $("#pasteDialog").showModal();
+  $("#pasteText").focus();
+}
+
+function startPasteReview() {
+  const text = $("#pasteText").value;
+  if (!text.trim()) return;
+  const link = $("#pasteLink").value.trim() ? parseRecipeLink($("#pasteLink").value) : null;
+  const a = analyzeRecipeText(text);
+  pasteState = {
+    text, linkHref: link ? link.href : "", title: a.title, slot: a.slot,
+    servings: a.yieldServings, servingsFound: a.yieldServings !== null,
+    rows: a.ingredients.map(pasteRowFromLine), instructions: a.instructions.join("\n"),
+  };
+  if (!pasteState.title) pasteState.title = suggestRecipeTitle({ url: pasteState.linkHref, text: "" }) === "" ? "" : suggestRecipeTitle({ url: pasteState.linkHref, text: "" });
+  $("#pasteStepInput").classList.add("hidden");
+  $("#pasteStepReview").classList.remove("hidden");
+  renderPasteReview();
+  $("#pasteDialog").querySelector(".paste-page").scrollTop = 0;
+  const first = $("#pasteStepReview").querySelector("h2");
+  first.tabIndex = -1; first.focus();
+}
+
+function savePastedRecipe(asDraft) {
+  pasteSyncFromFields();
+  const st = pasteState;
+  const showErr = (msg) => { const e = $("#pasteReviewError"); e.textContent = msg; e.classList.remove("hidden"); };
+  if (!asDraft && pasteBlockers(st).length) return showErr("Finish the items listed above, or save a draft.");
+  const items = st.rows.filter(r => pasteRowStatus(r) === "use").map(r => ({ food: r.food, grams: r.grams }));
+  const unmatched = st.rows.filter(r => pasteRowStatus(r) === "pending").map(r => r.original);
+  const reference = st.rows.filter(r => pasteRowStatus(r) === "keep").map(r => r.original);
+  const servingsOk = Number.isInteger(st.servings) && st.servings >= 1 && st.servings <= RECIPE_YIELD_MAX;
+  const source = { text: st.text };
+  if (st.linkHref) source.url = st.linkHref;
+  const name = st.title.trim() || suggestRecipeTitle({ url: st.linkHref, text: st.text }) || "Pasted recipe";
+  const record = orderedRecipeRecord({
+    id: newRecipeId(), slot: st.slot, name,
+    yieldServings: servingsOk ? st.servings : undefined,
+    items,
+    instructions: st.instructions.split("\n").map(x => x.trim()).filter(Boolean),
+    draft: asDraft ? true : undefined,
+    autoPlan: false,
+    createdAt: Date.now(),
+    source,
+    unmatched: asDraft && unmatched.length ? unmatched : undefined,
+    reference: reference.length ? reference : undefined,
+  });
+  const recipes = loadCustomRecipes();
+  recipes.push(record);
+  if (!saveCustomRecipes(recipes)) return showErr("Couldn't save: the browser's storage is full. Export a backup or remove a saved screenshot, then try again.");
+  syncCustomRecipesIntoTemplates();
+  $("#pasteDialog").close();
+  showSection("recipes");
+  showRecipeBookTab("mine");
+  return record;
+}
+
+// Saves the pasted text itself as a "Want to make" draft, with no review.
+function savePastedTextDraft() {
+  const text = $("#pasteText").value;
+  if (!text.trim()) return;
+  const link = $("#pasteLink").value.trim() ? parseRecipeLink($("#pasteLink").value) : null;
+  const a = analyzeRecipeText(text);
+  const source = { text };
+  if (link) source.url = link.href;
+  const record = orderedRecipeRecord({
+    id: newRecipeId(), slot: a.slot, name: a.title || suggestRecipeTitle({ url: link ? link.href : "", text }) || "Pasted recipe",
+    items: [], instructions: [], draft: true, autoPlan: false, createdAt: Date.now(), source,
+  });
+  const recipes = loadCustomRecipes();
+  recipes.push(record);
+  if (!saveCustomRecipes(recipes)) {
+    $("#pasteInputNote").textContent = "Couldn't save: the browser's storage is full.";
+    $("#pasteInputNote").classList.remove("hidden");
+    return;
+  }
+  syncCustomRecipesIntoTemplates();
+  $("#pasteDialog").close();
+  showSection("recipes");
+  showRecipeBookTab("mine");
+}
+
+function wirePasteRecipe() {
+  const open = () => openPasteDialog();
+  $("#pasteRecipeBtn").addEventListener("click", open);
+  $("#pasteRecipeBtn2").addEventListener("click", open);
+  $("#pasteCloseBtn").addEventListener("click", () => $("#pasteDialog").close());
+  $("#pasteDialog").addEventListener("click", (e) => { if (e.target === $("#pasteDialog")) $("#pasteDialog").close(); });
+  $("#pasteText").addEventListener("input", () => {
+    const has = $("#pasteText").value.trim().length > 0;
+    $("#pasteReviewBtn").disabled = !has;
+    $("#pasteSaveRawBtn").disabled = !has;
+  });
+  $("#pasteReviewBtn").addEventListener("click", startPasteReview);
+  $("#pasteSaveRawBtn").addEventListener("click", savePastedTextDraft);
+
+  const review = $("#pasteStepReview");
+  review.addEventListener("click", (e) => {
+    const st = pasteState;
+    if (!st) return;
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const i = Number(btn.dataset.i);
+    const rerender = () => { pasteSyncFromFields(); const top = $("#pasteDialog .paste-page").scrollTop; renderPasteReview(); $("#pasteDialog .paste-page").scrollTop = top; };
+    if (btn.classList.contains("rv-keep-btn")) { st.rows[i].keep = true; rerender(); }
+    else if (btn.classList.contains("rv-use-btn")) { st.rows[i].keep = false; rerender(); }
+    else if (btn.classList.contains("rv-suggest-btn")) { pasteAssignFood(st.rows[i], btn.dataset.food); rerender(); }
+    else if (btn.id === "pasteKeepAllBtn") { st.rows.forEach(r => { if (pasteRowStatus(r) === "pending") r.keep = true; }); rerender(); }
+    else if (btn.id === "pasteBackBtn") { pasteSyncFromFields(); review.classList.add("hidden"); $("#pasteStepInput").classList.remove("hidden"); $("#pasteText").focus(); }
+    else if (btn.id === "pasteSaveBtn") savePastedRecipe(false);
+    else if (btn.id === "pasteSaveDraftBtn") savePastedRecipe(true);
+    else if (btn.closest("#pasteSlot")) { st.slot = btn.dataset.value; pasteSyncFromFields(); review.querySelectorAll("#pasteSlot .bubble").forEach(b => { const on = b === btn; b.classList.toggle("selected", on); b.setAttribute("aria-pressed", String(on)); }); }
+  });
+  review.addEventListener("input", (e) => {
+    const st = pasteState;
+    if (!st) return;
+    const amt = e.target.closest(".rv-amount");
+    if (amt) {
+      const row = st.rows[Number(amt.dataset.i)];
+      row.amount = amt.value.trim() === "" ? null : Number(amt.value);
+      row.grams = row.food && row.unitKey ? gramsForAmount(row.food, row.amount, row.unitKey) : null; // typed -> exact grams recomputed
+      updatePasteSummary();
+      return;
+    }
+    if (e.target.id === "pasteName" || e.target.id === "pasteServings") { pasteSyncFromFields(); updatePasteSummary(); }
+  });
+  review.addEventListener("change", (e) => {
+    const st = pasteState;
+    if (!st) return;
+    const food = e.target.closest(".rv-food");
+    if (food) { pasteAssignFood(st.rows[Number(food.dataset.i)], food.value); pasteSyncFromFields(); const top = $("#pasteDialog .paste-page").scrollTop; renderPasteReview(); $("#pasteDialog .paste-page").scrollTop = top; return; }
+    const unit = e.target.closest(".rv-unit");
+    if (unit) {
+      const row = st.rows[Number(unit.dataset.i)];
+      const key = unit.value || null;
+      // Same physical amount in the new unit: the exact grams are kept and the
+      // shown number is re-expressed, so flipping units never drifts.
+      if (row.grams > 0 && key) {
+        const opt = reviewUnitOptions(row.food).find(o => o.key === key);
+        row.amount = Math.round(row.grams / (key === "kg" ? 1000 : opt.grams) * 100) / 100;
+        unit.closest(".rv-qty").querySelector(".rv-amount").value = row.amount;
+      } else if (key && row.amount > 0) {
+        row.grams = gramsForAmount(row.food, row.amount, key);
+      }
+      row.unitKey = key;
+      if (!row.grams) row.grams = row.amount > 0 && key ? gramsForAmount(row.food, row.amount, key) : null;
+      const needNote = unit.closest(".rv-row").querySelector(".rv-need");
+      if (needNote) needNote.classList.toggle("hidden", row.grams > 0);
+      updatePasteSummary();
+    }
+  });
+  review.addEventListener("click", () => {});
+}
+
 function showRecipeBookTab(name) {
   document.querySelectorAll("#recipeBookTabs .bubble").forEach(b => {
     b.classList.toggle("selected", b.dataset.value === name);
@@ -1635,6 +1959,7 @@ function showRecipeBookTab(name) {
   $("#recipeBookAllView").classList.toggle("hidden", name !== "all");
   $("#myRecipesView").classList.toggle("hidden", name !== "mine");
   $("#whatCanIMakeView").classList.toggle("hidden", name !== "cook");
+  updateSectionNavigation();
   if (name === "mine") renderMyRecipes();
   else if (name === "cook") renderWhatCanIMake({ fresh: true });
   else renderRecipeBook();
@@ -2185,7 +2510,7 @@ let customRecipeEditingId = null;
 // What the editor holds besides its visible inputs: the saved screenshot,
 // the pasted-text lines that couldn't be matched, and the fields it must carry
 // through untouched (made-date, creation time, which recipe this varies).
-let customRecipeExtra = { image: null, unmatched: [], keep: {} };
+let customRecipeExtra = { image: null, unmatched: [], reference: [], keep: {} };
 
 function setCustomRecipeImage(dataUrl) {
   customRecipeExtra.image = dataUrl || null;
@@ -2199,6 +2524,9 @@ function renderCustomRecipeUnmatched() {
   const lines = customRecipeExtra.unmatched;
   $("#customRecipeUnmatched").classList.toggle("hidden", !lines.length);
   $("#customRecipeUnmatchedList").innerHTML = lines.map(l => `<li>${escapeHtml(l)}</li>`).join("");
+  const ref = customRecipeExtra.reference || [];
+  $("#customRecipeReference").classList.toggle("hidden", !ref.length);
+  $("#customRecipeReferenceList").innerHTML = ref.map(l => `<li>${escapeHtml(l)}</li>`).join("");
 }
 
 // Shows/hides "Open original" for whatever link is currently typed.
@@ -2242,6 +2570,7 @@ function openCustomRecipeDialog(existing) {
   setCustomRecipeImage(src.image || null);
   refreshCustomRecipeLink();
   customRecipeExtra.unmatched = existing && Array.isArray(existing.unmatched) ? [...existing.unmatched] : [];
+  customRecipeExtra.reference = existing && Array.isArray(existing.reference) ? [...existing.reference] : [];
   renderCustomRecipeUnmatched();
   customRecipeExtra.keep = {};
   if (existing) for (const k of ["madeAt", "createdAt", "versionOf", "tweak"]) if (existing[k] !== undefined) customRecipeExtra.keep[k] = existing[k];
@@ -2459,7 +2788,20 @@ function openRecipeModal(meal) {
   // saved text can never be interpreted as markup or run as script.
   $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${escapeHtml(FOODS[i.food].name)} — ${escapeHtml(formatServing(i.food, i.grams))}</li>`).join("");
   $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("");
+  const tpl = MEAL_TEMPLATES.find(t => t.id === meal.id);
+  const ref = Array.isArray(meal.reference) ? meal.reference : (tpl && Array.isArray(tpl.reference) ? tpl.reference : []);
+  $("#recipeReferenceBox").classList.toggle("hidden", !ref.length);
+  $("#recipeReference").innerHTML = ref.map(l => `<li>${escapeHtml(l)}</li>`).join("");
   $("#recipeModal").showModal();
+}
+
+// "Also in this recipe": lines kept as written (never on the shopping list).
+// Shown wherever a meal's ingredients and steps are shown, so they travel with
+// the meal into the plan, saved plans and printouts. Text only, always escaped.
+function referenceBlockHTML(meal, title = "Also in this recipe") {
+  const ref = meal && Array.isArray(meal.reference) ? meal.reference : [];
+  if (!ref.length) return "";
+  return `<div class="booklet-reference"><strong>${title}</strong> <span class="booklet-ref-note">(not on the shopping list)</span><ul>${ref.map(l => `<li>${escapeHtml(l)}</li>`).join("")}</ul></div>`;
 }
 
 function renderDayTab(day, dayIndex, dailyBudget, dailyCalories, minDailyCost, trackCalories = true) {
@@ -2691,6 +3033,7 @@ function renderPrintBooklet(result) {
               <ol>${m.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
             </div>
           </div>
+          ${referenceBlockHTML(m)}
         </div>`;
       }).join("")}
     </div>`).join("");
@@ -2726,6 +3069,7 @@ function renderPrepBatches(batches) {
       <details class="prep-batch-instructions">
         <summary>📋 How to make this batch</summary>
         <ol>${b.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
+        ${referenceBlockHTML(b)}
       </details>
       <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
     </div>`).join("");
@@ -2755,6 +3099,7 @@ function renderPrintPrepGuide(result) {
           <ol>${b.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
         </div>
       </div>
+      ${referenceBlockHTML(b)}
       <p class="booklet-meal-macros">${PREP_STORAGE_NOTE}</p>
     </div>`).join("");
   return header + cards;
@@ -2904,8 +3249,6 @@ function renderPlan(result) {
   $("#shoppingList").innerHTML = renderShoppingList(shoppingList, summary.totalCost, summary.totalBudget);
 
   activateDay(activeDayNum);
-  $('.app-nav-btn[data-section="week"]').disabled = false;
-  $('.app-nav-btn[data-section="shopping"]').disabled = false;
 
   recordRecipesTried(plan);
   renderProgressStrip();
@@ -3023,21 +3366,48 @@ function renderHistoryView() {
 const SECTION_IDS = { settings: "settingsPanel", week: "resultsWeek", shopping: "resultsShopping", recipes: "resultsRecipes" };
 let activeSection = "settings";
 
-// Switches which top-level section is visible — same show/hide-by-id
-// pattern the rest of the app already uses (welcome/onboarding/settings),
-// just generalized to three sections plus a nav bar to pick between them.
-function showSection(name) {
-  if (!SECTION_IDS[name]) return;
-  activeSection = name;
+function updateSectionNavigation() {
+  const cooking = activeSection === "recipes" && !$("#whatCanIMakeView").classList.contains("hidden");
+  const selected = cooking ? "cook" : activeSection;
+  document.querySelectorAll(".app-nav-btn").forEach(button => {
+    const current = button.dataset.section === selected;
+    // Plan Setup lives under Your Week: while you're in it, Your Week stays
+    // marked as the tab you're in (the only visible one on a phone).
+    const parent = selected === "settings" && button.dataset.section === "week";
+    button.classList.toggle("active", current || parent);
+    button.classList.toggle("parent-active", parent);
+    if (current || parent) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+  const back = $("#backToWeekBtn");
+  if (back) back.classList.toggle("hidden", !currentPlanResult);
+}
+
+function showSection(name, { focus = false, scroll = true } = {}) {
+  const section = name === "cook" ? "recipes" : name;
+  if (!Object.hasOwn(SECTION_IDS, section)) return;
+  activeSection = section;
+  const noPlan = !currentPlanResult && (section === "week" || section === "shopping");
   Object.entries(SECTION_IDS).forEach(([sectionName, id]) => {
-    $(`#${id}`).classList.toggle("hidden", sectionName !== name);
+    $(`#${id}`).classList.toggle("hidden", noPlan || sectionName !== section);
   });
-  document.querySelectorAll(".app-nav-btn").forEach(b => {
-    const isActive = b.dataset.section === name;
-    b.classList.toggle("active", isActive);
-    b.setAttribute("aria-current", isActive ? "true" : "false");
-  });
-  $(`#${SECTION_IDS[name]}`).scrollIntoView({ behavior: "smooth", block: "start" });
+  $("#noPlanPanel").classList.toggle("hidden", !noPlan);
+  if (noPlan) {
+    $("#noPlanTitle").textContent = section === "week" ? "Start your week" : "Build your shopping list";
+    $("#noPlanMessage").textContent = section === "week"
+      ? "Set your grocery budget and household size to build your first meal plan."
+      : "Create a meal plan to see what to buy and how much it may cost.";
+  }
+  if (name === "cook") showRecipeBookTab("cook");
+  else if (name === "recipes" && !$("#whatCanIMakeView").classList.contains("hidden")) showRecipeBookTab("all");
+  updateSectionNavigation();
+  const panel = noPlan ? $("#noPlanPanel") : $(`#${SECTION_IDS[section]}`);
+  if (focus) {
+    const heading = name === "cook" ? $("#findMealHeading") : panel.querySelector("h2");
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
+  if (scroll) panel.scrollIntoView({ block: "start" });
 }
 
 let activeDayNum = 1;
@@ -3093,13 +3463,25 @@ function init() {
   }
   if (!restoredPlan) renderProgressStrip();
   activeSection = restoredPlan ? "week" : "settings";
-  showSection(activeSection);
+  if (localStorage.getItem(ONBOARDED_KEY)) showSection(activeSection, { scroll: false });
 
   document.querySelectorAll(".app-nav-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      if (!btn.disabled) showSection(btn.dataset.section);
+      showSection(btn.dataset.section, { focus: true });
     });
   });
+
+  $("#noPlanSetupBtn").addEventListener("click", () => showSection("settings", { focus: true }));
+  $("#planSetupBtn").addEventListener("click", () => showSection("settings", { focus: true }));
+  $("#backToWeekBtn").addEventListener("click", () => showSection("week", { focus: true }));
+  // App Tools: choosing something that opens its own dialog closes the menu;
+  // so does clicking elsewhere or pressing Escape. Text size and theme stay
+  // open so you can adjust them and see the result.
+  const appTools = $("#appTools");
+  const closeAppTools = () => { appTools.open = false; };
+  ["#preferencesBtn", "#pricesBtn", "#exportDataBtn", "#importDataBtn", "#resetAppBtn"].forEach(sel => $(sel).addEventListener("click", closeAppTools));
+  document.addEventListener("click", (e) => { if (appTools.open && !appTools.contains(e.target)) closeAppTools(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && appTools.open) { closeAppTools(); appTools.querySelector("summary").focus(); } });
 
   // Recipe Book — browsable independent of any generated plan, so it's
   // wired and rendered here in init() rather than alongside renderPlan().
@@ -3251,6 +3633,7 @@ function init() {
       tweak: customRecipeExtra.keep.tweak,
       source: Object.keys(source).length ? source : undefined,
       unmatched: mode === "draft" && customRecipeExtra.unmatched.length ? customRecipeExtra.unmatched : undefined,
+      reference: customRecipeExtra.reference.length ? customRecipeExtra.reference : undefined,
     });
 
     const recipes = loadCustomRecipes();
@@ -3298,6 +3681,7 @@ function init() {
 
   // ---- Recipe Book tabs + My Recipes view
   wireWhatCanIMake();
+  wirePasteRecipe();
   $("#recipeBookTabs").addEventListener("click", (e) => {
     const b = e.target.closest(".bubble");
     if (b) showRecipeBookTab(b.dataset.value);

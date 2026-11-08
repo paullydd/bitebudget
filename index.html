@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>BiteBudget</title>
 <meta name="description" content="Plan varied meals for your household that fit your grocery budget — track calories and macros if that's your goal.">
 <meta name="theme-color" content="#3f7d5c" media="(prefers-color-scheme: light)">
@@ -16,31 +16,60 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="app-header">
-    <div class="header-toolbar">
-      <button type="button" id="preferencesBtn" class="text-link-btn">🎯 Preferences</button>
-      <button type="button" id="pricesBtn" class="text-link-btn">💲 Edit Prices</button>
-      <div class="text-size-toggle" role="group" aria-label="Text size">
-        <button type="button" id="textSizeDown" aria-label="Decrease text size">A−</button>
-        <span id="textSizeLabel" class="text-size-label">100%</span>
-        <button type="button" id="textSizeUp" aria-label="Increase text size">A+</button>
+  <div class="app-shell">
+  <aside class="app-sidebar">
+    <header class="app-header">
+      <div class="app-brand">
+        <h1><img src="icons/icon.svg" alt="" class="logo-mark"> BiteBudget</h1>
+        <p>Plan meals around your budget and what you have.</p>
       </div>
-      <button type="button" id="themeToggle" class="icon-toggle-btn" aria-label="Toggle dark mode">🌙</button>
-    </div>
-    <h1><img src="icons/icon.svg" alt="" class="logo-mark"> BiteBudget</h1>
-    <p>Plan varied meals for your household that fit your grocery budget — track calories and macros if that's your goal.</p>
-  </header>
+    </header>
 
-  <div id="progressStrip" class="progress-strip hidden"></div>
-  <div id="planNudge" class="plan-nudge hidden" role="status"></div>
-
-  <main>
     <nav id="appNav" class="app-nav hidden" aria-label="App sections">
-      <button type="button" class="app-nav-btn" data-section="settings">⚙️ Settings</button>
-      <button type="button" class="app-nav-btn" data-section="week" disabled>📅 Your Week</button>
-      <button type="button" class="app-nav-btn" data-section="shopping" disabled>🛒 Shopping List</button>
-      <button type="button" class="app-nav-btn" data-section="recipes">📖 Recipes</button>
+      <button type="button" class="app-nav-btn" data-section="week"><span class="nav-icon" aria-hidden="true">📅</span> <span class="nav-label">Your Week</span></button>
+      <button type="button" class="app-nav-btn" data-section="recipes"><span class="nav-icon" aria-hidden="true">📖</span> <span class="nav-label">Recipes</span></button>
+      <button type="button" class="app-nav-btn" data-section="cook"><span class="nav-icon" aria-hidden="true">🍳</span> <span class="nav-label">Find a Meal</span></button>
+      <button type="button" class="app-nav-btn" data-section="shopping"><span class="nav-icon" aria-hidden="true">🛒</span> <span class="nav-label">Shopping</span></button>
+      <button type="button" class="app-nav-btn app-nav-secondary" data-section="settings"><span class="nav-icon" aria-hidden="true">⚙️</span> <span class="nav-label">Plan Setup</span></button>
     </nav>
+
+    <details class="app-tools" id="appTools">
+      <summary><span aria-hidden="true">🧰</span> App Tools</summary>
+      <div class="app-tools-panel">
+        <div class="app-tools-group">
+          <h2>Preferences</h2>
+          <button type="button" id="preferencesBtn" class="text-link-btn">🎯 Food preferences</button>
+          <button type="button" id="pricesBtn" class="text-link-btn">💲 Edit prices</button>
+        </div>
+        <div class="app-tools-group">
+          <h2>Appearance</h2>
+          <div class="app-tools-row">
+            <div class="text-size-toggle" role="group" aria-label="Text size">
+              <button type="button" id="textSizeDown" aria-label="Decrease text size">A−</button>
+              <span id="textSizeLabel" class="text-size-label">100%</span>
+              <button type="button" id="textSizeUp" aria-label="Increase text size">A+</button>
+            </div>
+            <button type="button" id="themeToggle" class="icon-toggle-btn" aria-label="Toggle dark mode">🌙</button>
+          </div>
+        </div>
+        <div class="app-tools-group">
+          <h2>Backup &amp; data</h2>
+          <button type="button" id="exportDataBtn" class="text-link-btn">⬇️ Export my data</button>
+          <button type="button" id="importDataBtn" class="text-link-btn">⬆️ Import data</button>
+          <input type="file" id="importDataInput" accept="application/json" class="hidden">
+          <button type="button" id="resetAppBtn" class="text-link-btn">Reset app</button>
+        </div>
+      </div>
+    </details>
+  </aside>
+
+  <div class="app-content">
+  <main>
+    <section id="noPlanPanel" class="panel empty-state hidden">
+      <h2 id="noPlanTitle">Start your week</h2>
+      <p id="noPlanMessage">Set your grocery budget and household size to build your first meal plan.</p>
+      <button type="button" id="noPlanSetupBtn" class="primary-btn">Set up a plan</button>
+    </section>
 
     <section id="welcomeScreen" class="panel welcome-screen">
       <img src="icons/icon.svg" alt="BiteBudget logo" class="welcome-icon">
@@ -167,7 +196,10 @@
     </section>
 
     <section id="settingsPanel" class="panel hidden">
-      <h2>Settings</h2>
+      <div class="results-head">
+        <h2>Plan Setup</h2>
+        <button type="button" id="backToWeekBtn" class="secondary-btn hidden">← Back to Your Week</button>
+      </div>
       <form id="planForm">
         <details class="settings-section" open>
           <summary>Plan basics</summary>
@@ -340,6 +372,7 @@
       <div class="results-head">
         <h2>Your Plan</h2>
         <div class="results-head-buttons">
+          <button type="button" id="planSetupBtn" class="secondary-btn">⚙️ Plan Setup</button>
           <button type="button" id="printPrepGuideBtn" class="secondary-btn hidden">🧺 Print Prep Guide</button>
           <button type="button" id="printBookletBtn" class="secondary-btn">🖨️ Print Full Plan</button>
           <button id="regenerateBtn" class="secondary-btn">🔀 Shuffle for more variety</button>
@@ -348,25 +381,31 @@
 
       <div id="planMeta" class="meta-grid"></div>
 
-      <h3>📊 Week Dashboard</h3>
-      <div id="weekDashboard"></div>
+      <div id="planNudge" class="plan-nudge hidden" role="status"></div>
+      <details class="plan-disclosure">
+        <summary id="weekOverviewHeading">Week at a glance</summary>
+        <div id="weekOverview" class="week-overview-wrap"></div>
+      </details>
+
+      <div id="dayTabs" class="day-tabs"></div>
+      <div id="dayViews"></div>
 
       <div id="prepBatchesSection" class="hidden">
-        <h3>🧺 This Week's Batches</h3>
+        <h3>This Week's Batches</h3>
         <p class="wizard-hint">Cook each of these once, then portion out for the week.</p>
         <div id="prepBatches" class="prep-batches-grid"></div>
       </div>
 
-      <h3 id="weekOverviewHeading">📅 Week at a Glance</h3>
-      <div id="weekOverview" class="week-overview-wrap"></div>
-
-      <div id="dayTabs" class="day-tabs"></div>
-      <div id="dayViews"></div>
+      <details class="plan-disclosure">
+        <summary>Budget and nutrition dashboard</summary>
+        <div id="weekDashboard"></div>
+      </details>
+      <div id="progressStrip" class="progress-strip hidden"></div>
     </section>
 
     <section id="resultsShopping" class="panel hidden">
       <div class="shopping-head">
-        <h2>Weekly Shopping List</h2>
+        <h2>Shopping List</h2>
         <button type="button" id="pantryBtn" class="secondary-btn">🥫 Pantry</button>
         <button type="button" id="printListBtn" class="secondary-btn">🖨️ Print Shopping List</button>
       </div>
@@ -376,7 +415,10 @@
     <section id="resultsRecipes" class="panel hidden">
       <div class="shopping-head">
         <h2>📖 Recipe Book</h2>
-        <button type="button" id="addRecipeBtn" class="secondary-btn">✨ Add Your Recipe</button>
+        <div class="recipe-head-actions">
+          <button type="button" id="pasteRecipeBtn" class="primary-btn">📋 Paste Recipe</button>
+          <button type="button" id="addRecipeBtn" class="secondary-btn">＋ Add by hand</button>
+        </div>
       </div>
       <div class="bubble-group recipe-book-tabs" id="recipeBookTabs" role="group" aria-label="Recipe Book view">
         <button type="button" class="bubble selected" data-value="all">📖 All recipes</button>
@@ -385,7 +427,7 @@
       </div>
 
       <div id="recipeBookAllView">
-      <p class="wizard-hint">Every recipe in BiteBudget, browsable on its own — favorite or rule out anything here and it carries into your next plan, no need to wait for it to show up first. Your own recipes show up here too, once they're complete.</p>
+      <p class="wizard-hint">Browse built-in and completed personal recipes. Favorite meals you want to see more often.</p>
 
       <div class="form-row">
         <label for="recipeSearch">Search</label>
@@ -431,6 +473,7 @@
       </div>
 
       <div id="whatCanIMakeView" class="hidden">
+        <h3 id="findMealHeading">Find a meal with what you have</h3>
         <p class="wizard-hint">Pick lunches and dinners from what's already in your kitchen. Recipes you can cook right now come first, then ones that are one or two ingredients short, with what to buy and what it adds to your shopping basket. Your pantry is never changed unless you change it here.</p>
         <div class="wcim-controls">
           <div class="wizard-slot">
@@ -463,8 +506,10 @@
 
       <div id="myRecipesView" class="hidden">
         <p class="wizard-hint">Your cookbook: recipes you've written and ones you've saved from Instagram, Pinterest, a website, pasted text or a screenshot. Save a link now and fill in the details whenever you're ready — a recipe joins your plans only once its ingredients, quantities and servings are confirmed.</p>
-        <div class="my-recipes-toolbar">
-          <button type="button" id="newPersonalRecipeBtn" class="primary-btn">＋ Save a recipe</button>
+        <div class="paste-cta">
+          <button type="button" id="pasteRecipeBtn2" class="primary-btn paste-cta-btn">📋 Paste Recipe</button>
+          <p>Paste a whole recipe from a website or a caption. BiteBudget fills in the title, servings, ingredients and steps wherever it can, and you review it before saving.</p>
+          <button type="button" id="newPersonalRecipeBtn" class="text-link-btn">Or save a link or screenshot, or type one in</button>
         </div>
         <div class="wizard-slot">
           <div class="wizard-slot-label" id="myRecipesFilterLabel">Show</div>
@@ -480,6 +525,11 @@
       </div>
     </section>
   </main>
+  <footer>
+    <p>Prices are estimates. Set your local prices in App Tools.</p>
+  </footer>
+  </div>
+  </div>
 
   <dialog id="recipeModal" class="recipe-modal">
     <div class="recipe-page">
@@ -498,6 +548,11 @@
           <div id="nutritionLabel"></div>
           <h3>Ingredients</h3>
           <ul id="recipeIngredients"></ul>
+          <div id="recipeReferenceBox" class="recipe-reference hidden">
+            <h3>Also in this recipe</h3>
+            <p class="wizard-hint">Kept as written. These are not on your shopping list.</p>
+            <ul id="recipeReference"></ul>
+          </div>
         </div>
         <div class="recipe-instructions">
           <h3>Instructions</h3>
@@ -547,6 +602,28 @@
     </div>
   </dialog>
 
+  <dialog id="pasteDialog" class="paste-dialog" aria-labelledby="pasteTitle">
+    <div class="paste-page">
+      <button type="button" id="pasteCloseBtn" class="recipe-close" aria-label="Close">✕</button>
+      <div id="pasteStepInput">
+        <h2 id="pasteTitle">📋 Paste Recipe</h2>
+        <p class="wizard-hint">Paste the whole recipe from a website or a social post: title, servings, ingredients and steps. You'll check everything before it's saved, and your original text is kept.</p>
+        <label for="pasteText" class="visually-hidden">Recipe text</label>
+        <textarea id="pasteText" class="paste-text" rows="14" placeholder="Paste the recipe here…" spellcheck="false"></textarea>
+        <details class="paste-link">
+          <summary>Add the original link (optional)</summary>
+          <input type="url" id="pasteLink" placeholder="https://…" autocomplete="off" aria-label="Link to the original recipe">
+        </details>
+        <p id="pasteInputNote" class="wizard-hint hidden" role="status"></p>
+        <div class="paste-actions">
+          <button type="button" id="pasteReviewBtn" class="primary-btn" disabled>Review recipe →</button>
+          <button type="button" id="pasteSaveRawBtn" class="secondary-btn" disabled>Save text as draft</button>
+        </div>
+      </div>
+      <div id="pasteStepReview" class="hidden"></div>
+    </div>
+  </dialog>
+
   <dialog id="customRecipeDialog" class="achievements-dialog custom-recipe-dialog">
     <div class="achievements-page">
       <button type="button" id="customRecipeCloseBtn" class="recipe-close" aria-label="Close">✕</button>
@@ -584,6 +661,10 @@
         <div id="customRecipeUnmatched" class="custom-recipe-unmatched hidden">
           <strong>These lines weren't added — add them by hand:</strong>
           <ul id="customRecipeUnmatchedList"></ul>
+        </div>
+        <div id="customRecipeReference" class="custom-recipe-unmatched hidden">
+          <strong>Kept as written (not on your shopping list):</strong>
+          <ul id="customRecipeReferenceList"></ul>
         </div>
         <div class="form-row">
           <label for="customRecipeYield">Makes how many servings?</label>
@@ -717,15 +798,6 @@
   <div id="printBooklet" class="print-booklet"></div>
   <div id="printPrepGuide" class="print-booklet"></div>
 
-  <footer>
-    <p>BiteBudget uses national-average grocery prices, not live store data — edit <code>js/foods.js</code> to match your local prices.</p>
-    <div class="footer-actions">
-      <button type="button" id="exportDataBtn" class="text-link-btn">⬇️ Export my data</button>
-      <button type="button" id="importDataBtn" class="text-link-btn">⬆️ Import data</button>
-      <input type="file" id="importDataInput" accept="application/json" class="hidden">
-      <button type="button" id="resetAppBtn" class="text-link-btn">Reset app</button>
-    </div>
-  </footer>
 
   <script src="js/foods.js"></script>
   <script src="js/meals.js"></script>

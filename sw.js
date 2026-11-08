@@ -1,4 +1,4 @@
-const CACHE_NAME = "bitebudget-v4";
+const CACHE_NAME = "bitebudget-v6";
 const APP_SHELL = [
   "./",
   "./index.html",

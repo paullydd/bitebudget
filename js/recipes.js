@@ -137,6 +137,21 @@ function gramsForUnitWord(food, unitWord, qty) {
   return opt ? qty * opt.grams : null;
 }
 
+// Packaged amounts that state their size: "1 (15 oz) can black beans",
+// "2 cans (14 oz each) ...", "1 can (15 oz) ...". A can with NO stated size
+// is not converted — a can's size isn't something to guess.
+const CONTAINER_NOUN = "(?:cans?|jars?|packages?|pkgs?|bags?|boxes|box|cartons?|bottles?|packs?|tubs?)";
+const CONTAINER_WORD = new RegExp("^" + CONTAINER_NOUN + "\\b\\s*(?:of\\s+)?", "i");
+function matchContainerSize(q) {
+  const size = "\\(?\\s*(\\d+(?:\\.\\d+)?)\\s*(oz|ounces?|g|grams?)\\b\\.?(?:\\s*each)?\\s*\\)?";
+  let m = q.rest.match(new RegExp("^" + size + "\\s*" + CONTAINER_NOUN + "\\b\\s*(?:of\\s+)?", "i"))
+       || q.rest.match(new RegExp("^" + CONTAINER_NOUN + "\\s*" + size + "\\s*(?:of\\s+)?", "i"));
+  if (!m) return null;
+  const n = Number(m[1]);
+  const isOz = /^o/i.test(m[2]);
+  return { grams: q.qty * n * (isOz ? GRAMS_PER_OZ : 1), rest: q.rest.slice(m[0].length) };
+}
+
 const UNIT_WORD = /^(kilograms?|kg|grams?|g|ounces?|oz|pounds?|lbs?|cups?|tablespoons?|tbsps?|teaspoons?|tsps?)\b\.?\s*(?:of\s+)?/i;
 
 // One ingredient line -> {food, grams} when the food is in the catalog AND the
@@ -146,12 +161,16 @@ const UNIT_WORD = /^(kilograms?|kg|grams?|g|ounces?|oz|pounds?|lbs?|cups?|tables
 function parseIngredientLine(line) {
   const q = parseQuantityPrefix(line);
   if (!q || q.range) return null;
-  const um = q.rest.match(UNIT_WORD);
-  const phrase = um ? q.rest.slice(um[0].length) : q.rest;
+  const box = matchContainerSize(q);
+  const um = box ? null : q.rest.match(UNIT_WORD);
+  let phrase = box ? box.rest : um ? q.rest.slice(um[0].length) : q.rest;
+  if (um) phrase = phrase.replace(CONTAINER_WORD, ""); // "15 oz can black beans"
   const hit = matchCatalogFood(phrase);
   if (!hit) return null;
   let grams = null;
-  if (um) {
+  if (box) {
+    grams = box.grams;
+  } else if (um) {
     grams = gramsForUnitWord(hit.food, um[1], q.qty);
   } else {
     const su = SERVING_UNITS[hit.food];
@@ -169,7 +188,11 @@ const METHOD_HEADER = /^(instructions?|directions?|method|steps?|preparation|how
 
 function parseServings(text) {
   const found = new Set();
-  const re = /(?:\b(?:serves|servings?|makes|yields?)\b\s*[:\-]?\s*(\d{1,3})(?!\s*(?:-|–|to)\s*\d)|\b(\d{1,3})\s+servings?\b)/gi;
+  // A range ("Serves 4-6", "10-12 servings", "4 to 6 servings") is a question
+  // for the person, never a number we pick: it counts as ambiguous.
+  const range = /\b(?:serves|servings?|makes|yields?)\b\s*[:\-]?\s*\d{1,3}\s*(?:-|–|—|to)\s*\d|\b\d{1,3}\s*(?:-|–|—|to)\s*\d{1,3}\s+servings?\b/i;
+  if (range.test(text)) return null;
+  const re = /(?:\b(?:serves|servings?|makes|yields?)\b\s*[:\-]?\s*(\d{1,3})(?!\d)|\b(\d{1,3})\s+servings?\b)/gi;
   let m;
   while ((m = re.exec(text))) found.add(Number(m[1] || m[2]));
   const vals = [...found].filter(n => n >= 1 && n <= 100);
@@ -230,6 +253,244 @@ function parseRecipeText(text) {
   return result;
 }
 
+// ---------- Paste-first review (line by line) ----------
+// parseRecipeText above keeps the "grouped by food" shape the editor's
+// Fill-in button uses. The paste review needs every line on its own, so
+// each one can be confirmed, corrected or kept as written.
+
+// The unit words people write, mapped to a unit key (see reviewUnitOptions).
+function unitKeyForWord(word) {
+  const u = String(word).toLowerCase().replace(/\.$/, "");
+  if (/^(g|grams?)$/.test(u)) return "g";
+  if (/^(kg|kilograms?)$/.test(u)) return "kg";
+  if (/^(oz|ounces?)$/.test(u)) return "oz";
+  if (/^(lbs?|pounds?)$/.test(u)) return "lb";
+  if (/^cups?$/.test(u)) return "cup";
+  if (/^(tbsps?|tablespoons?)$/.test(u)) return "tbsp";
+  if (/^(tsps?|teaspoons?)$/.test(u)) return "tsp";
+  return null;
+}
+
+// Units an ingredient can be entered in: the editor's list plus pounds.
+function reviewUnitOptions(food) {
+  const opts = kitchenUnitOptions(food).slice();
+  const oz = opts.findIndex(o => o.key === "oz");
+  opts.splice(oz + 1, 0, { key: "lb", label: "lb", grams: 16 * GRAMS_PER_OZ });
+  return opts;
+}
+
+// Exact grams for amount x unit of a food, or null if the food has no such unit.
+function gramsForAmount(food, amount, unitKey) {
+  if (!(amount > 0)) return null;
+  if (unitKey === "kg") return amount * 1000;
+  const opt = reviewUnitOptions(food).find(o => o.key === unitKey);
+  return opt ? amount * opt.grams : null;
+}
+
+const SEASONING_FILLER = new Set(["ground", "dried", "fresh", "freshly", "kosher", "sea", "black", "white", "smoked", "crushed",
+  "cracked", "and", "or", "to", "taste", "bay", "leaf", "leave", "italian", "extra", "pinch", "dash", "of", "a", "the", "optional", "more", "for", "serving", "chopped", "red", "powder", "flake", "seasoning", "spice", "blend", "rub", "mix"]);
+const SPICE_CORE = new Set(["salt", "pepper", "cumin", "paprika", "oregano", "thyme", "rosemary", "sage", "cinnamon", "nutmeg",
+  "cayenne", "turmeric", "coriander", "cardamom", "allspice", "chili", "chile", "chipotle", "garlic", "onion", "curry", "seasoning", "spice", "cajun", "taco", "ranch", "parsley", "cilantro", "basil", "dill", "msg"]);
+
+// Salt, pepper and spices: the catalog doesn't track them, so they are never
+// on the shopping list. Recognized only when the line really reads like a
+// seasoning (a spoon/pinch/"to taste"/no amount) so "1 cup basil" or
+// "1 red pepper" are NOT swept up.
+function isSeasoningLine(rest, unitKey, hasQty) {
+  const lower = String(rest).toLowerCase();
+  const toTaste = /\bto taste\b/.test(lower);
+  if (hasQty && !toTaste && !["tsp", "tbsp", "pinch", "dash"].includes(unitKey)) return false;
+  const words = normWords(String(rest).split(",")[0]);
+  if (!words.length) return false;
+  const core = words.filter(w => SPICE_CORE.has(w));
+  if (!core.length) return false;
+  if (!words.every(w => SPICE_CORE.has(w) || SEASONING_FILLER.has(w))) return false;
+  // Bare "pepper"/"garlic"/"onion"/"chili"/"basil" etc. is often a real
+  // vegetable ("1 red pepper", "2 garlic") unless the line says powder,
+  // flakes, ground, black/white, seasoning or "to taste".
+  const marker = words.some(w => ["powder", "flake", "seasoning", "spice", "blend", "rub", "ground", "dried", "black", "white", "cracked", "salt", "cumin", "paprika", "cayenne", "oregano", "thyme", "msg", "cinnamon", "nutmeg", "turmeric", "coriander"].includes(w))
+    || toTaste || ["tsp", "tbsp", "pinch", "dash"].includes(unitKey);
+  if (core.every(w => ["pepper", "garlic", "onion", "chili", "chile", "chipotle", "basil", "parsley", "cilantro", "dill"].includes(w))
+      && !words.some(w => ["powder", "flake", "seasoning", "spice", "blend", "rub", "ground", "dried", "black", "white", "cracked"].includes(w))
+      && !toTaste && !["tsp", "tbsp", "pinch", "dash"].includes(unitKey)) return false;
+  return marker;
+}
+
+// Up to three catalog foods that a loosely worded line could mean, as
+// SUGGESTIONS for a person to confirm (never applied automatically): every
+// meaningful word of the line appears in the food's name. "rice" suggests
+// both White and Brown Rice; "beans" suggests nothing if several fit.
+function suggestCatalogFoods(phrase) {
+  const drop = new Set([...FOOD_DESCRIPTORS, "can", "jar", "package", "pkg", "bag", "box", "carton", "bottle", "pack", "tub", "clove", "slice", "piece", "stalk", "head", "bunch", "sprig", "leaf", "leave"]);
+  const words = normWords(String(phrase).split(",")[0]).filter(w => !drop.has(w));
+  if (!words.length) return [];
+  const foods = Object.keys(FOODS);
+  const all = foods.filter(f => { const fw = normWords(FOODS[f].name); return words.every(w => fw.includes(w)); });
+  if (all.length) {
+    // Foods whose NAME ENDS with what was written come first ("rice" -> Brown/
+    // White Rice before Rice Cakes); the rest only fill up to three.
+    const last = words[words.length - 1];
+    const head = all.filter(f => normWords(FOODS[f].name).slice(-1)[0] === last);
+    return (head.length >= 2 ? head : [...head, ...all.filter(f => !head.includes(f))]).slice(0, 3);
+  }
+  // One distinctive word (e.g. "chopped spinach leaves"): only when exactly one food has it.
+  const hits = new Set();
+  for (const w of words) if (w.length >= 4) for (const f of foods) if (normWords(FOODS[f].name).includes(w)) hits.add(f);
+  return hits.size === 1 ? [...hits] : [];
+}
+
+// One ingredient line -> how the review shows it.
+//   ready     {food, grams, amount, unitKey} - food AND quantity both certain
+//   seasoning kept as written automatically (not tracked in the catalog)
+//   review    needs a person: {reason, suggestions[], amount, unitKey}
+// Nothing is guessed: an uncertain line is returned whole, with what WAS
+// readable (the amount as written) so correcting it is one choice, not a retype.
+function classifyIngredientLine(rawLine) {
+  const original = String(rawLine).replace(/^\s*[-*•–·]\s*/, "").trim();
+  const q = parseQuantityPrefix(original);
+  const parsed = parseIngredientLine(original);
+  const box = q && !q.range ? matchContainerSize(q) : null;
+  const um = q && !q.range && !box ? q.rest.match(UNIT_WORD) : null;
+  let unitKey = um ? unitKeyForWord(um[1]) : null;
+  const rest = q && !q.range ? (box ? box.rest : um ? q.rest.slice(um[0].length).replace(CONTAINER_WORD, "") : q.rest) : original;
+  const hasQty = !!q && !q.range;
+  if (!parsed && isSeasoningLine(rest, /^(pinch|dash)\b/i.test(rest) ? "pinch" : unitKey, hasQty)) return { kind: "seasoning", original };
+  if (parsed) {
+    // Show it in the unit it was written in when the food has that unit.
+    const su = SERVING_UNITS[parsed.food];
+    let key = box ? "g" : unitKey || (su ? su.unit : "g");
+    if (!reviewUnitOptions(parsed.food).some(o => o.key === key) && key !== "kg") key = "g";
+    return { kind: "ready", original, food: parsed.food, grams: parsed.grams, unitKey: key };
+  }
+  const row = { kind: "review", original, suggestions: suggestCatalogFoods(rest), amount: null, unitKey: null, reason: "" };
+  if (!q) row.reason = "No amount written";
+  else if (q.range) row.reason = "A range of amounts";
+  else {
+    row.amount = q.qty;
+    if (box) { row.amount = box.grams; row.unitKey = "g"; }
+    else if (unitKey) row.unitKey = unitKey;
+    else row.unitKey = "count";
+    if (/\bcans?\b|\bjars?\b|\bpackages?\b|\bbags?\b/i.test(rest) && !box && !um) row.reason = "Package size not stated";
+    else if (!row.suggestions.length) row.reason = "Not in the food catalog";
+    else row.reason = "Couldn't confirm the food or its amount";
+  }
+  if (q && !q.range && !row.suggestions.length) row.reason = row.reason || "Not in the food catalog";
+  return row;
+}
+
+const COOKING_VERB = /\b(add|mix|stir|bake|cook|simmer|boil|heat|preheat|combine|whisk|serve|season|bring|reduce|pour|chop|slice|blend|brown|saut[eé]|fry|roast|grill|drain|top|place|cover|let|toss|fold|spread|garnish|set|remove|transfer|cut|dice|mince|rinse|stir-fry|microwave|refrigerate|chill)\b/i;
+const SOCIAL_NOISE = /^(#|@)|\bfollow\b.*@|\b(save|share|comment|like)\b.*\b(this|for later|below)\b|^https?:\/\//i;
+
+function guessMealSlot(title, text) {
+  const t = `${title}`.toLowerCase();
+  if (/\b(breakfast|pancakes?|waffles?|oatmeal|omelet+e?|scramble|smoothie|granola|french toast|overnight oats|frittata|muffins?)\b/.test(t)) return "breakfast";
+  if (/\b(snack|bites?|dip|energy balls?|trail mix|popcorn)\b/.test(t)) return "snack";
+  if (/\b(lunch|sandwich|wrap|salad|bowl)\b/.test(t)) return "lunch";
+  return "dinner";
+}
+
+// Metadata lines ("Serves 4", "Prep time: 10 min", "Cook: 20 min", "Calories 300").
+// A step that merely begins with the word ("Cook until golden", "Makes sure...") is NOT metadata.
+const RECIPE_META_LINE = /^[^\p{L}\p{N}]*(?:(?:serves|servings?|makes|yields?)\s*[:\-–]?\s*\d|(?:prep|cook|total)\s*time\b|(?:prep|cook|total)\s*[:\-–]\s*\d|calories\b\s*[:\-–]?\s*\d|nutrition\b|per serving\b)/iu;
+const REVIEW_INGREDIENT_HEADER = /^(ingredients?|what you'?ll need|you'?ll need)(?:\s*\(.*\))?$/i;
+const REVIEW_METHOD_HEADER = /^(instructions?|directions?|method|steps?|preparation|how to make it|how to)$/i;
+function headingText(line) {
+  return String(line).replace(/^[^\p{L}\p{N}]+/u, "").replace(/[^\p{L}\p{N})\]]+$/u, "").trim();
+}
+
+// Splits "2 eggs, 1 cup rice" or "2 eggs • 1 cup rice" into separate lines
+// without breaking "black beans, drained" (a comma is a split only when a new
+// amount follows it).
+function splitIngredientLine(line) {
+  return String(line).split(/\s*[•·|]\s*|[,;]\s+(?=\d|[½¼¾⅓⅔⅛])/).map(x => x.trim()).filter(Boolean);
+}
+
+// Method lines: "1. Brown the turkey", "Step 2: stir", "Bake at 350F for 20 minutes",
+// "Then add the beans.", or any sentence of four or more words with a cooking verb.
+const STEP_START = new RegExp("^(?:(?:then|next|finally|meanwhile|once done),?\\s+)?" + COOKING_VERB.source.replace(/^\\b/, ""), "i");
+function isNumberedStep(line) {
+  return /^(?:step\s*)?\d+\s*[.):]\s+\S/i.test(line) || /^\d\uFE0F?\u20E3/u.test(line);
+}
+function looksLikeStep(line) {
+  if (isNumberedStep(line)) return true;
+  if (parseQuantityPrefix(line)) return false;
+  if (STEP_START.test(line)) return true;
+  return /[.!?]$/.test(line) && line.split(/\s+/).length >= 4 && COOKING_VERB.test(line);
+}
+
+// Whole pasted recipe/caption -> everything the review screen shows.
+// The original text is never altered or dropped (the caller stores it as-is);
+// anything not recognized as an ingredient or step simply stays in it.
+function analyzeRecipeText(text) {
+  const raw = String(text || "");
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const out = { title: "", slot: "dinner", yieldServings: parseServings(raw), ingredients: [], instructions: [], foundIngredientSection: false };
+  if (!lines.length) return out;
+
+  const firstHeading = headingText(lines[0]);
+  if (firstHeading && firstHeading.length <= 80 && !parseQuantityPrefix(firstHeading) && !REVIEW_INGREDIENT_HEADER.test(firstHeading)
+      && !REVIEW_METHOD_HEADER.test(firstHeading) && !/[.?]$/.test(lines[0]) && !SOCIAL_NOISE.test(firstHeading)
+      && !/\b(serves|servings?|makes|yields?)\b/i.test(firstHeading)) {
+    out.title = firstHeading;
+  }
+  out.slot = guessMealSlot(out.title, raw);
+
+  const headOf = (l) => headingText(headingText(l).split(/[:：]/)[0]);
+  const hasHeaders = lines.some(l => REVIEW_INGREDIENT_HEADER.test(headOf(l)) || REVIEW_METHOD_HEADER.test(headOf(l)));
+  const addIngredientText = (chunk) => {
+    for (const piece of splitIngredientLine(chunk)) out.ingredients.push(classifyIngredientLine(piece));
+  };
+  const addStep = (line) => {
+    const step = line.replace(/^(?:step\s*)?\d+\s*[.):]\s*/i, "").replace(/^\d️?⃣\s*/u, "").replace(/^[-*•]\s*/, "").trim();
+    if (step) out.instructions.push(step);
+  };
+
+  let mode = null;
+  let sawIngredient = false;
+  let inferredSteps = false;
+  lines.forEach((line, i) => {
+    if (i === 0 && out.title) return;
+    const head = headingText(line);
+    const headPart = headOf(line);
+    const afterColon = line.includes(":") ? line.slice(line.indexOf(":") + 1).trim() : "";
+    if (REVIEW_INGREDIENT_HEADER.test(headPart)) {
+      mode = "ingredients"; inferredSteps = false; out.foundIngredientSection = true;
+      if (afterColon) { addIngredientText(afterColon); sawIngredient = true; }
+      return;
+    }
+    if (REVIEW_METHOD_HEADER.test(headPart)) {
+      mode = "steps";
+      if (afterColon) addStep(afterColon);
+      return;
+    }
+    if (SOCIAL_NOISE.test(line)) return;
+    if (RECIPE_META_LINE.test(line)) return; // "Serves 4", "Prep time: 10 min" - not an ingredient
+    if (hasHeaders && mode) {
+      if (mode === "ingredients") {
+        if (/:$/.test(line) && !/\d/.test(line)) return; // "For the sauce:" group label
+        // A numbered or imperative line in the ingredient list (no Directions
+        // heading, or a step that follows the list) is a step, not an ingredient.
+        if (looksLikeStep(line)) { addStep(line); inferredSteps = true; return; }
+        // Once steps have started, a line with no amount ("Makes sure it's hot",
+        // "Enjoy!") is a step too; an amount-led line is still an ingredient.
+        if (inferredSteps && !parseQuantityPrefix(line)) { addStep(line); return; }
+        addIngredientText(line); sawIngredient = true;
+      } else {
+        addStep(line);
+      }
+      return;
+    }
+    // No section headings (a caption): read by shape.
+    if (isNumberedStep(line)) { addStep(line); return; }
+    if (parseQuantityPrefix(line)) { addIngredientText(line); sawIngredient = true; return; }
+    if (line.length <= 45 && !/[.!?]$/.test(line) && !STEP_START.test(line) && (suggestCatalogFoods(line).length || isSeasoningLine(line, null, false))) {
+      addIngredientText(line); sawIngredient = true; return; // an ingredient written with no amount
+    }
+    if (looksLikeStep(line)) addStep(line);
+  });
+  return out;
+}
+
 // ---------- What a recipe still needs ----------
 
 const DATA_URL_IMAGE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -256,7 +517,7 @@ function orderedRecipeRecord(r) {
   if (r.yieldServings !== undefined) out.yieldServings = r.yieldServings;
   out.items = r.items;
   out.instructions = r.instructions;
-  for (const key of ["draft", "autoPlan", "made", "madeAt", "createdAt", "versionOf", "tweak", "source", "unmatched"]) {
+  for (const key of ["draft", "autoPlan", "made", "madeAt", "createdAt", "versionOf", "tweak", "source", "unmatched", "reference"]) {
     if (r[key] !== undefined) out[key] = r[key];
   }
   return out;

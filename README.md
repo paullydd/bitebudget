@@ -11,12 +11,16 @@ that runs in any modern browser.
 
 ## What it does
 
-- **Navigation menu** — ⚙️ Settings, 📅 Your Week, and 🛒 Shopping List are
-  three separate sections reachable from a nav bar instead of one long
-  scrolling page. "Your Week" and "Shopping List" stay disabled until a
-  plan actually exists; generating one switches you there automatically,
-  and everything else (shuffling, swapping a meal, editing prices) leaves
-  you exactly where you were instead of jumping you around.
+- **Navigation** — a left sidebar on desktop (it takes width, not height, so
+  the weekly plan and recipe screens keep their full vertical space) and a
+  fixed bottom tab bar on phones: Your Week, Recipes, Find a Meal and
+  Shopping, with the active tab highlighted and labels always visible.
+  Page content always clears the bottom bar. **Plan Setup** is one click
+  from Your Week (and Your Week stays highlighted while you are in it, with
+  a Back button). **App Tools** groups Preferences (food preferences, local
+  prices), Appearance (text size, theme) and Backup & data (export, import,
+  reset). Your Week and Shopping explain how to get started before you have
+  a plan.
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
   day for a plan of 1–14 days, rotating through 126 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3
@@ -212,6 +216,22 @@ that runs in any modern browser.
   a day's meal card, which is a quick one-off swap (freehand macros, no
   ingredients, never re-selected by the planner) for something like eating
   out where you don't know the exact recipe.
+- **Paste Recipe** — in My Recipes, paste a whole recipe from a website or
+  social caption into one large box. BiteBudget fills in the title, meal,
+  servings, ingredients, quantities and steps where it can read them, and
+  matches ingredients to the food catalog (it understands `1 1/2 cups rice`,
+  `½ lb ground turkey`, `2 eggs`, and sized cans like `1 can (15 oz) beans`).
+  One review screen follows: confidently matched ingredients are ready to
+  save with no clicks, uncertain lines sit in a small **Needs review**
+  section with your original line and a suggested match (correct it or
+  **Keep as written**), and the screen says which lines affect the shopping
+  list and what must still be resolved before the recipe can be planned
+  accurately. **Save as draft** is always one click. Quantities are never
+  guessed (an unsized can, "1 medium onion" or "2-3 cloves" asks you) and no
+  line is dropped: salt, pepper and spices the catalog doesn't track are
+  kept as reference text. Your original text is saved with the recipe, and
+  lines you keep as written appear under "Also in this recipe". It does not
+  read links or screenshots.
 - **My Recipes (personal cookbook)** — a tab inside the Recipe Book for
   recipes you save from anywhere: a pasted link (Instagram, Pinterest, any
   site — "Open original" reopens it), pasted text, a screenshot, typing it

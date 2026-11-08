@@ -18,7 +18,7 @@ that runs in any modern browser.
   and everything else (shuffling, swapping a meal, editing prices) leaves
   you exactly where you were instead of jumping you around.
 - **Meal planning** — generates breakfast, lunch, dinner, and 1–2 snacks per
-  day for a plan of 1–14 days, rotating through 109 built-in recipe templates
+  day for a plan of 1–14 days, rotating through 126 built-in recipe templates
   (a mix of familiar staples and more adventurous options), with at least 3
   templates for every meal style (bowl, wrap/sandwich, stir-fry, soup, salad,
   smoothie) at both lunch and dinner, plus high-protein snacks (protein
@@ -82,16 +82,21 @@ that runs in any modern browser.
   week's recipes actually use, and that rounding gap is a real estimate
   of what's likely left in the fridge after shopping — capped to the 8
   most worth remembering so it stays a short, actionable list instead of
-  a wall of 50-cent odds and ends. Nothing is added without you clicking
-  "+ Add," and nothing in the pantry is ever removed automatically either
-  — regenerating, shuffling, or swapping a meal never touches it, only
-  you do, once you've actually used something up.
+  a wall of 50-cent odds and ends. These are projections only: they
+  don't exist until you've shopped, so they count toward your pantry stock
+  (and change the shopping list) only after you enter what you actually
+  have and click "Confirm on hand." Nothing in the pantry is ever removed
+  automatically either — regenerating, shuffling, or swapping a meal never
+  touches it, only you do, once you've actually used something up.
 - **Dietary filters** — Vegetarian, Gluten-free, and Dairy-free toggles in
   Settings → Advanced (and mirrored in the Recipe Book for browsing) are
   independent and stack — picking all three narrows the planner to only
-  recipes matching every one, same hard-filter-with-safety-valve mechanism
-  as appliance/style filtering, so a combination that would otherwise empty
-  a meal slot out just skips that filter rather than breaking planning.
+  recipes matching every one. Dietary filters are hard rules: if no recipe
+  fits a meal slot, that slot is left open as a "No matching recipe"
+  placeholder that explains which restriction caused it (try again after
+  relaxing a filter, or log your own meal), rather than serving something
+  that breaks the restriction. (Appliance and meal-style preferences are
+  softer and fall back to the full pool instead.)
   Every food is tagged based on its typical grocery version (e.g. plain soy
   sauce, not tamari) — a helpful default, not a verified source, so always
   check the actual label for a real allergy or celiac-level restriction.
@@ -196,14 +201,52 @@ that runs in any modern browser.
 - **Add Your Recipe** — a "✨ Add Your Recipe" button in the Recipe Book
   lets you build a real recipe (name, meal slot, ingredients picked from
   the same food catalog everything else uses, optional instructions) that
-  behaves exactly like a built-in one: it's eligible for auto-planning,
-  shows up in the shopping list with real ingredient quantities, gets
-  nutrition/cost computed automatically instead of typed in, and can be
-  favorited or printed. Marked with a "✨ Yours" badge and an ✏️ edit
+  behaves like a built-in one in the planner and shopping list: it's
+  eligible for auto-planning only while its "Include in automatic plans"
+  switch is on (new recipes start with it off; recipes saved before the
+  switch existed stay eligible), and a completed recipe can always be
+  placed by hand with Add to Plan. It shows up in the shopping list with
+  real ingredient quantities, gets nutrition/cost computed automatically
+  instead of typed in, and can be favorited or printed. Marked with a "✨ Yours" badge and an ✏️ edit
   button in the Recipe Book. This is different from "Log your own meal" on
   a day's meal card, which is a quick one-off swap (freehand macros, no
   ingredients, never re-selected by the planner) for something like eating
   out where you don't know the exact recipe.
+- **My Recipes (personal cookbook)** — a tab inside the Recipe Book for
+  recipes you save from anywhere: a pasted link (Instagram, Pinterest, any
+  site — "Open original" reopens it), pasted text, a screenshot, typing it
+  in, or a mix. Everything is local: BiteBudget doesn't read links or run
+  OCR, it keeps your source and lets you fill in the details. Pasted text
+  only prefills what it can read reliably (title, one clear servings
+  number, ingredient lines that match the catalog with a convertible unit);
+  anything uncertain is left blank and unmatched lines are listed for you
+  to add by hand. A recipe can be saved as **Want to make** with just a
+  title and its source; it shows what's missing, stays out of every plan,
+  and gets **Add to Plan** only once ingredients, quantities and servings
+  are confirmed. **Made** and **Favorite** are separate. Each recipe has an
+  "Include in automatic plans" switch (off for new ones; recipes saved
+  earlier keep working as before). **Suggest Tweaks** offers Lower cost,
+  Use what I have, and More protein swaps from the catalog, with the
+  ingredient, amount and before/after cost and protein per serving, and
+  respects your dietary filters; accepting one saves a new version linked
+  to the original, which stays untouched. (More fiber is unavailable: the
+  catalog has no fiber data.) Links, drafts, screenshots and versions are
+  included in Export/Import.
+- **What can I make?** — a tab in the Recipe Book for picking lunches and
+  dinners from what you already have, to make fewer store trips. Choose
+  Lunch or Dinner, servings, and optionally the plan slot it's for. Built-in
+  recipes and your completed personal recipes (even with automatic plans
+  off; never drafts) are checked against your confirmed pantry and dietary
+  filters: **Ready to cook** first, then **Missing 1–2 ingredients**, each
+  showing exactly what's short and how the shopping list changes (priced in
+  purchasable quantities, whole-basket). Meals already in your plan keep
+  their claim on the pantry so the same groceries aren't promised twice;
+  choosing a slot to replace releases that slot's ingredients first.
+  Repeated ingredient rows are combined before checking stock. Each result
+  has View Recipe and Add to Plan (preset to the slot and servings you
+  evaluated), and the view has a quick pantry editor. Pantry counts only
+  change when you change them ("✓ I have it", the editor, or Confirm on
+  hand), never by browsing or planning.
 - **"Not for me" (👎)** — sitting right next to the favorite button, this is
   real feedback on one specific recipe, not just a taste-profile bias: mark
   a meal you actually made and didn't like, and that exact recipe is
@@ -367,6 +410,7 @@ bitebudget/
 ├── js/foods.js          # Nutrition + price database (per 100g)
 ├── js/meals.js           # Meal templates (ingredients + instructions)
 ├── js/planner.js         # Plan-generation algorithm
+├── js/recipes.js         # Personal-recipe helpers: link/text parsing, tweaks
 └── js/app.js              # UI wiring, rendering, localStorage persistence
 ```
 

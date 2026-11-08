@@ -1,4 +1,4 @@
-const CACHE_NAME = "bitebudget-v2";
+const CACHE_NAME = "bitebudget-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "./js/foods.js",
   "./js/meals.js",
   "./js/planner.js",
+  "./js/recipes.js",
   "./js/app.js",
   "./manifest.json",
   "./icons/icon-192.png",

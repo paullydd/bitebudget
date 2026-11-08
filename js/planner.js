@@ -1,6 +1,51 @@
+// Whether the automatic planner may pick a template. Built-in recipes always
+// can. A personal recipe can unless its Include-in-automatic-plans setting is
+// explicitly off — recipes saved before that setting existed have no value
+// and keep being planned exactly as before. (Drafts never reach
+// MEAL_TEMPLATES at all; see syncCustomRecipesIntoTemplates in js/app.js.)
+// Add to Plan is a deliberate, manual placement and ignores this.
+function isPlannable(t) {
+  return !t.userRecipe || (!t.draft && t.autoPlan !== false);
+}
+
+// A recipe's `items` are the WHOLE batch it makes; `yieldServings` is how
+// many servings that batch makes. Built-in recipes and legacy user recipes
+// have no field and are one serving — exactly how the planner has always
+// read them — so nothing already saved changes meaning.
+function templateYield(t) {
+  const y = t && t.yieldServings;
+  return Number.isInteger(y) && y >= 1 ? y : 1;
+}
+
+// One serving of a recipe (unrounded). Everything the planner does per
+// person — macro fit, cost ranking, calorie scaling — starts from this.
+function servingItems(t) {
+  const y = templateYield(t);
+  return y === 1 ? t.items : t.items.map(({ food, grams }) => ({ food, grams: grams / y }));
+}
+
 // Scale a template's item list by a factor, rounding grams to the nearest 5g.
-function scaleItems(items, factor) {
-  return items.map(({ food, grams }) => ({ food, grams: Math.max(5, Math.round((grams * factor) / 5) * 5) }));
+function scaleItems(items, factor, step = 5) {
+  return items.map(({ food, grams }) => {
+    const scaled = grams * factor;
+    // step 0 = exact: no rounding and no minimum (see itemStep).
+    return { food, grams: step > 0 ? Math.max(step, Math.round(scaled / step) * step) : scaled };
+  });
+}
+
+// Built-in recipes are written one serving at a time with 5g granularity,
+// so 5g rounding is right for them. A multi-serving recipe divides a whole
+// batch down to one person: a 1g pinch of spice in a 4-serving batch is
+// 0.25g each, and ANY rounding step — 5g, or even half a gram — inflates it
+// (and rounding the per-person amount before multiplying by household size
+// compounds the error). So multi-serving recipes scale exactly, in one pass,
+// like placed meals do; display rounds, the shopping list rounds up to real
+// packages anyway.
+function itemStep(template) {
+  // The same applies to ANY user recipe, even a one-serving one: its
+  // amounts are the user's own (a 2g pinch means 2g), not built-in
+  // numbers designed around 5g granularity.
+  return template.userRecipe || templateYield(template) > 1 ? 0 : 5;
 }
 
 // How much to stretch/shrink a recipe from its own designed base size.
@@ -72,7 +117,7 @@ function preferenceWeight(template, slot, preferences) {
 // split. Manhattan distance between two ratios that each sum to 1, so it
 // ranges 0 (identical split) to 2 (completely disjoint).
 function macroDistance(template, macroSplit) {
-  const n = computeNutrition(template.items);
+  const n = computeNutrition(servingItems(template));
   if (n.cal <= 0) return 2;
   const proteinPct = (n.protein * 4) / n.cal;
   const carbPct = (n.carbs * 4) / n.cal;
@@ -108,15 +153,19 @@ function weightedPick(candidates, weights) {
 // remaining candidates by how well they match stated taste preferences and
 // fine-grained macro fit within that narrowed set.
 function pickTemplate(slot, recentIds, diet, overBudget, preferences, macroSplit) {
-  let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
+  let pool = MEAL_TEMPLATES.filter(t => t.slot === slot && isPlannable(t));
 
-  // Combined restrictions (e.g. vegetarian + gluten-free + dairy-free at
-  // once) could plausibly empty a slot's pool out entirely given how
-  // omnivore-heavy this recipe set is — same safety valve as every other
-  // hard filter below: never let that happen, just skip the filter.
+  // Dietary restrictions (vegetarian, gluten-free, dairy-free) are
+  // safety-critical for people with allergies or celiac disease, not a
+  // taste preference — unlike every other filter below, this one is NOT
+  // allowed a safety valve. If combining restrictions genuinely leaves no
+  // recipe in this slot's pool, return null and let the caller leave the
+  // slot unfilled rather than silently serving something that violates
+  // the restriction.
   if (diet) {
     const filtered = pool.filter(t => matchesDiet(t.items, diet));
-    if (filtered.length > 0) pool = filtered;
+    if (filtered.length === 0) return null;
+    pool = filtered;
   }
 
   // Equipment you don't have is a hard constraint, not a taste
@@ -153,7 +202,7 @@ function pickTemplate(slot, recentIds, diet, overBudget, preferences, macroSplit
   if (fresh.length === 0) fresh = pool; // all recently used, allow repeats
 
   // Rank by base cost; when over budget, bias toward the cheaper half.
-  const withCost = fresh.map(t => ({ t, cost: computeNutrition(t.items).cost }));
+  const withCost = fresh.map(t => ({ t, cost: computeNutrition(servingItems(t)).cost }));
   withCost.sort((a, b) => a.cost - b.cost);
   let candidates = overBudget ? withCost.slice(0, Math.max(1, Math.ceil(withCost.length / 2))) : withCost;
 
@@ -200,7 +249,7 @@ function estimateMinDailyCost(dailyCalories, snacksPerDay, diet, trackCalories =
 
   let total = 0;
   for (const slot of slots) {
-    let pool = MEAL_TEMPLATES.filter(t => t.slot === slot);
+    let pool = MEAL_TEMPLATES.filter(t => t.slot === slot && isPlannable(t));
     const filtered = pool.filter(t => matchesDiet(t.items, diet));
     if (filtered.length > 0) pool = filtered;
     const pct = slot === "snack" ? snackPct : slotPct[slot];
@@ -208,7 +257,7 @@ function estimateMinDailyCost(dailyCalories, snacksPerDay, diet, trackCalories =
 
     let cheapest = Infinity;
     for (const t of pool) {
-      const base = computeNutrition(t.items);
+      const base = computeNutrition(servingItems(t));
       const factor = computeFactor(base, targetCal, trackCalories);
       cheapest = Math.min(cheapest, base.cost * factor);
     }
@@ -241,18 +290,38 @@ function recomputeDayTotals(day) {
 // covers it — still included, not filtered out, so the UI can show
 // "already have enough" instead of it silently disappearing.
 function buildShoppingList(plan, pantry = {}) {
-  const shoppingMap = {};
-  for (const day of plan) {
-    for (const meal of day.meals) {
-      for (const { food, grams } of meal.items) {
-        shoppingMap[food] = (shoppingMap[food] || 0) + grams;
-      }
-    }
-  }
-  return Object.entries(shoppingMap).map(([food, neededGrams]) => {
+  return shoppingLinesFromNeeds(planNeeds(plan), pantry);
+}
+
+// Total grams of every food a plan needs ({food: grams}), repeated rows and
+// repeated meals combined. `skip` ({dayIndex, mealIndex}) leaves one slot out
+// — used to ask "what would the plan need if this meal weren't there?".
+function planNeeds(plan, skip) {
+  const needs = {};
+  plan.forEach((day, di) => {
+    day.meals.forEach((meal, mi) => {
+      if (skip && skip.dayIndex === di && skip.mealIndex === mi) return;
+      for (const { food, grams } of meal.items) needs[food] = (needs[food] || 0) + grams;
+    });
+  });
+  return needs;
+}
+
+// The pantry-discounted, purchase-rounded, priced lines for a {food: grams}
+// need map. buildShoppingList is this plus planNeeds, so anything that
+// prices a hypothetical basket (What can I make?) can't drift from the real
+// shopping list.
+function shoppingLinesFromNeeds(needs, pantry = {}) {
+  return Object.entries(needs).map(([food, neededGrams]) => {
     const fromPantry = Math.min(neededGrams, Math.max(0, pantry[food] || 0));
     const grams = neededGrams - fromPantry;
-    return { food, name: FOODS[food].name, grams, fromPantry, cost: (FOODS[food].price * grams) / 100 };
+    // Priced from what you're actually told to buy (e.g. a whole dozen
+    // eggs), not the raw grams a recipe uses — you can't buy 1 egg's
+    // worth at the store. See roundUpToPurchase/shoppingPurchaseGrams in
+    // js/foods.js, the same rounding formatShoppingQty displays.
+    const purchaseGrams = shoppingPurchaseGrams(food, grams);
+    const cost = (FOODS[food].price * purchaseGrams) / 100;
+    return { food, name: FOODS[food].name, grams, fromPantry, cost };
   }).sort((a, b) => b.cost - a.cost);
 }
 
@@ -319,6 +388,12 @@ function selectPrepPool(slot, count, diet, preferences, macroSplit) {
   const usedIds = [];
   for (let i = 0; i < count; i++) {
     const template = pickTemplate(slot, usedIds, diet, false, prepPreferences, macroSplit);
+    // No recipe satisfies the diet restriction for this slot at all —
+    // stop here rather than crash on a null template. Caller gets
+    // whatever distinct picks were found before this (possibly none),
+    // and generatePlan's day loop falls back to pickTemplate per day,
+    // which will also return null and mark the slot unmatched.
+    if (!template) break;
     pool.push(template);
     usedIds.push(template.id);
   }
@@ -360,6 +435,38 @@ function groupIntoPrepBatches(plan) {
 // one recipe per named slot for that many occurrences — "prep lunch 4
 // times" cooks one lunch recipe once and reuses it for the first 4 days;
 // the remaining days (and any slot left at 0) pick fresh as usual.
+// True when at least one recipe for this slot satisfies the diet — i.e.
+// exactly when pickTemplate will NOT return null for it. Lets callers that
+// re-pick several slots at once (applyCustomMeal's rebalance) tell a slot
+// they can fill from one that has to stay unmatched, before they start
+// doing calorie math around it.
+function hasDietMatch(slot, diet) {
+  return MEAL_TEMPLATES.some(t => t.slot === slot && isPlannable(t) && matchesDiet(t.items, diet));
+}
+
+// Human-readable reason shown on an unfilled slot card — which active
+// restriction(s) left no matching recipe, so the user knows what to relax
+// rather than just seeing an empty meal.
+function dietRestrictionLabel(diet) {
+  const active = [];
+  if (diet.vegetarian) active.push("vegetarian");
+  if (diet.glutenFree) active.push("gluten-free");
+  if (diet.dairyFree) active.push("dairy-free");
+  if (active.length === 0) return "No matching recipe was found for this meal.";
+  return `No ${active.join(" + ")} recipe is available for this meal. Add a recipe that fits, or relax this restriction for this meal.`;
+}
+
+// The placeholder that stands in for a slot no recipe can fill under the
+// active diet. One definition, so generation, swap and rebalance can't drift.
+function unmatchedMeal(slot, servings, diet) {
+  return {
+    slot, id: null, name: null, items: [], instructions: [],
+    nutrition: { cal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 },
+    servings, prepTime: null, cookTime: null, prepped: false,
+    unmatched: true, unmatchedReason: dietRestrictionLabel(diet),
+  };
+}
+
 function generatePlan(settings, preferences, pantry = {}) {
   const {
     days, dailyCalories, macroSplit, budgetPeriod, budgetAmount,
@@ -380,7 +487,12 @@ function generatePlan(settings, preferences, pantry = {}) {
     const count = Math.min(days, Math.max(0, (mealPrep && mealPrep[slot]) || 0));
     if (count > 0) {
       const [template] = selectPrepPool(slot, 1, diet, preferences, effectiveMacroSplit);
-      prepRemaining[slot] = { template, remaining: count };
+      // No recipe fits this diet for this slot at all — skip meal prep for
+      // it; the day loop below falls through to a per-day pickTemplate
+      // call, which will also come back null and mark each day unmatched
+      // (with the reason shown) instead of prepping something that
+      // violates the restriction.
+      if (template) prepRemaining[slot] = { template, remaining: count };
     }
   });
 
@@ -407,11 +519,22 @@ function generatePlan(settings, preferences, pantry = {}) {
         template = pickTemplate(slot, recent[slot], diet, overBudgetSoFar, preferences, effectiveMacroSplit);
       }
 
-      const base = computeNutrition(template.items);
+      if (!template) {
+        // No recipe in the library satisfies the active diet restriction(s)
+        // for this slot. Leave it genuinely unfilled rather than falling
+        // back to an unfiltered pick that could violate an allergy or
+        // celiac restriction — the UI shows unmatchedReason and offers a
+        // manual swap once the restriction is relaxed or a fitting recipe
+        // is added.
+        dayMeals.push(unmatchedMeal(slot, servings, diet));
+        continue;
+      }
+
+      const base = computeNutrition(servingItems(template));
       const factor = computeFactor(base, targetCal, trackCalories);
-      const personItems = scaleItems(template.items, factor);
+      const personItems = scaleItems(servingItems(template), factor, itemStep(template));
       const personNutrition = computeNutrition(personItems);
-      const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
+      const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
 
       dayMeals.push({
         slot, id: template.id, name: template.name, items, instructions: template.instructions,
@@ -473,11 +596,23 @@ function regenerateMeal(result, dayIndex, mealIndex, settings, preferences, pant
   const overBudget = day.totals.cost > dailyBudget;
   const template = pickTemplate(slot, avoidIds, diet, overBudget, preferences, effectiveMacroSplit);
 
-  const base = computeNutrition(template.items);
+  if (!template) {
+    // No recipe for this slot satisfies the active diet restriction(s) at
+    // all — same safety rule as initial generation. Leave the slot
+    // genuinely unfilled rather than swapping in something that could
+    // violate an allergy or celiac restriction.
+    day.meals[mealIndex] = unmatchedMeal(slot, servings, diet);
+    recomputeDayTotals(day);
+    result.shoppingList = buildShoppingList(result.plan, pantry);
+    result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
+    return result;
+  }
+
+  const base = computeNutrition(servingItems(template));
   const factor = computeFactor(base, targetCal, trackCalories);
-  const personItems = scaleItems(template.items, factor);
+  const personItems = scaleItems(servingItems(template), factor, itemStep(template));
   const personNutrition = computeNutrition(personItems);
-  const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
+  const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
 
   day.meals[mealIndex] = {
     slot, id: template.id, name: template.name, items, instructions: template.instructions,
@@ -516,12 +651,16 @@ function regeneratePrepBatch(result, batchId, settings, preferences, pantry = {}
   const targetCal = dailyCalories * slotPct[slot];
   const prepPreferences = withPrepStyleFilter(preferences, slot);
   const template = pickTemplate(slot, [batchId], diet, false, prepPreferences, effectiveMacroSplit);
+  // No other recipe for this slot satisfies the active diet restriction —
+  // nothing safe to reroll to, so leave the existing prepped batch as-is
+  // rather than crash or serve something that violates the restriction.
+  if (!template) return result;
 
-  const base = computeNutrition(template.items);
+  const base = computeNutrition(servingItems(template));
   const factor = computeFactor(base, targetCal, trackCalories);
-  const personItems = scaleItems(template.items, factor);
+  const personItems = scaleItems(servingItems(template), factor, itemStep(template));
   const personNutrition = computeNutrition(personItems);
-  const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
+  const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
 
   result.plan.forEach(day => {
     day.meals.forEach((m, i) => {
@@ -580,8 +719,27 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
   day.meals[mealIndex] = customMeal;
 
   if (rebalance) {
-    const spentCal = day.meals.filter(m => m.custom).reduce((s, m) => s + m.nutrition.cal, 0);
-    const openSlots = day.meals.map((m, i) => ({ m, i })).filter(({ m }) => !m.custom);
+    // Rebalancing re-evaluates every auto-picked meal against the CURRENT
+    // diet. If no recipe fits a slot any more, the meal already sitting
+    // there can't be re-picked — but it can't be kept either: it was chosen
+    // under a looser diet, and leaving it would put a meal on the plan that
+    // breaks the restriction (an allergen or gluten the user has since
+    // ruled out). It becomes an unmatched placeholder, exactly as it would
+    // at generation time. Logged meals and deliberately placed recipes are
+    // the user's own choices and stay (placement is explicit, so it's the
+    // user's call if a placed recipe doesn't fit the diet filter).
+    day.meals.forEach((m, i) => {
+      if (!m.custom && !m.placed && !m.unmatched && !hasDietMatch(m.slot, diet)) {
+        day.meals[i] = unmatchedMeal(m.slot, servings, diet);
+      }
+    });
+
+    // What's left is either a logged meal, an unmatched slot (0 cal), or an
+    // auto-picked meal that can be re-picked. Fixed meals' calories come
+    // off the day's target before the open slots split what remains.
+    const canRepick = (m) => !m.custom && !m.placed && hasDietMatch(m.slot, diet);
+    const spentCal = day.meals.filter(m => !canRepick(m)).reduce((s, m) => s + m.nutrition.cal, 0);
+    const openSlots = day.meals.map((m, i) => ({ m, i })).filter(({ m }) => canRepick(m));
     const totalWeight = openSlots.reduce((s, { m }) => s + weightOf(m.slot), 0);
     const remainingCal = Math.max(0, dailyCalories - spentCal);
     const overBudget = day.totals ? day.totals.cost > dailyBudget : false;
@@ -595,11 +753,15 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
       avoidIds.push(m.id);
 
       const template = pickTemplate(m.slot, avoidIds, diet, overBudget, preferences, effectiveMacroSplit);
-      const base = computeNutrition(template.items);
+      // canRepick already guarantees a diet match, so this can't fire today —
+      // but a null here must never reach template.items, so it stays as a
+      // guard against the two ever drifting apart.
+      if (!template) return;
+      const base = computeNutrition(servingItems(template));
       const factor = computeFactor(base, targetCal, trackCalories);
-      const personItems = scaleItems(template.items, factor);
+      const personItems = scaleItems(servingItems(template), factor, itemStep(template));
       const personNutrition = computeNutrition(personItems);
-      const items = servings !== 1 ? scaleItems(personItems, servings) : personItems;
+      const items = servings !== 1 ? scaleItems(personItems, servings, itemStep(template)) : personItems;
       day.meals[i] = {
         slot: m.slot, id: template.id, name: template.name, items, instructions: template.instructions,
         nutrition: { ...personNutrition, cost: personNutrition.cost * servings },
@@ -613,4 +775,121 @@ function applyCustomMeal(result, dayIndex, mealIndex, customMeal, settings, pref
   result.shoppingList = buildShoppingList(result.plan, pantry);
   result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
   return result;
+}
+
+
+// Puts a specific recipe into one slot of an existing plan ("Add to Plan").
+// The ONLY multiplier is requested servings / recipe yield — not calorie
+// targets, not household size — so 2 servings of a 4-serving chili is
+// exactly half the batch. The meal is flagged `placed` so a later rebalance
+// (applyCustomMeal) treats it as fixed, like a logged meal. nutrition is
+// per portion, matching every other meal (items / servings), and cost is
+// the whole placed amount. The shopping list is rebuilt immediately, from
+// purchasable quantities (buildShoppingList), not raw grams.
+function placeRecipeInPlan(result, dayIndex, mealIndex, template, servings, pantry = {}) {
+  const day = result.plan[dayIndex];
+  const target = day && day.meals[mealIndex];
+  if (!target) return result;
+  const portions = Math.max(1, Math.round(Number(servings) || 1));
+  const factor = portions / templateYield(template);
+  // Exact, not rounded: rounding each placement can nudge a total over a
+  // purchase-size boundary (453.6g -> 453.60001g buys an extra ounce).
+  const items = template.items.map(({ food, grams }) => ({ food, grams: grams * factor }));
+  const n = computeNutrition(items);
+  day.meals[mealIndex] = {
+    slot: target.slot, id: template.id, name: template.name, items, instructions: template.instructions,
+    nutrition: { cal: n.cal / portions, protein: n.protein / portions, carbs: n.carbs / portions, fat: n.fat / portions, cost: n.cost },
+    servings: portions,
+    prepTime: template.prepTime, cookTime: template.cookTime,
+    placed: true,
+  };
+  recomputeDayTotals(day);
+  result.shoppingList = buildShoppingList(result.plan, pantry);
+  result.summary.totalCost = result.shoppingList.reduce((s, i) => s + i.cost, 0);
+  return result;
+}
+
+// ---- What can I make? ------------------------------------------------------
+// Float dust only (see ceilQtyExact in js/foods.js): any real shortfall counts.
+const PANTRY_EPSILON = 1e-7;
+
+// {food: grams} for a recipe cooked for `servings`, with repeated ingredient
+// rows combined. Same factor placeRecipeInPlan uses, so what's checked is
+// exactly what Add to Plan would put in the plan.
+function recipeNeeds(template, servings) {
+  const portions = Math.max(1, Math.round(Number(servings) || 1));
+  const factor = portions / templateYield(template);
+  const needs = {};
+  for (const { food, grams } of template.items) needs[food] = (needs[food] || 0) + grams * factor;
+  return needs;
+}
+
+// Can this recipe be cooked from the pantry, and what would it add to the
+// shopping basket? `target` ({dayIndex, mealIndex}) is the slot it would
+// replace: that slot's own ingredients are released first, so its pantry
+// reservation is free to use. Every OTHER planned meal keeps its claim on
+// the pantry — the pantry is one pool and the plan's meals draw from it, so
+// the same groceries are never promised twice. With no target, the recipe is
+// an extra meal on top of the whole plan. The pantry itself is never changed.
+//   status: "ready" (nothing short), "near" (1–2 ingredients short), "far".
+//   extraCost: whole-basket change, priced in purchasable quantities
+//   (negative when the replacement is cheaper than what it displaces).
+function evaluateRecipe(template, servings, plan, target, pantry = {}) {
+  const needs = recipeNeeds(template, servings);
+  const rows = plan || [];
+  const current = planNeeds(rows);
+  const others = target ? planNeeds(rows, target) : current;
+  const after = { ...others };
+  for (const [food, g] of Object.entries(needs)) after[food] = (after[food] || 0) + g;
+
+  const linesOf = (n) => Object.fromEntries(shoppingLinesFromNeeds(n, pantry).map(l => [l.food, l]));
+  const beforeLines = linesOf(current), afterLines = linesOf(after);
+  const total = (lines) => Object.values(lines).reduce((s, l) => s + l.cost, 0);
+
+  const short = [];
+  for (const [food, need] of Object.entries(needs)) {
+    const have = Math.max(0, pantry[food] || 0);
+    const reserved = Math.min(have, others[food] || 0);
+    const available = have - reserved;
+    const shortGrams = need - available;
+    if (shortGrams <= PANTRY_EPSILON) continue;
+    short.push({
+      food, name: FOODS[food].name, needGrams: need, haveGrams: have, reservedGrams: reserved,
+      availableGrams: available, shortGrams,
+      // The shopping list's own line for this food before and after: grams
+      // still to buy once the pantry is used. The quantity shown to the user
+      // and the price beside it both come from these, so they can't disagree.
+      buyBeforeGrams: beforeLines[food] ? beforeLines[food].grams : 0,
+      buyAfterGrams: afterLines[food] ? afterLines[food].grams : 0,
+      cost: (afterLines[food] ? afterLines[food].cost : 0) - (beforeLines[food] ? beforeLines[food].cost : 0),
+    });
+  }
+  short.sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name));
+  const basketBefore = total(beforeLines), basketAfter = total(afterLines);
+  return {
+    template, servings: Math.max(1, Math.round(Number(servings) || 1)),
+    status: short.length === 0 ? "ready" : short.length <= 2 ? "near" : "far",
+    short, missingCount: short.length,
+    basketBefore, basketAfter, extraCost: basketAfter - basketBefore,
+  };
+}
+
+// Every cookable recipe for one meal type, best first: Ready to cook, then
+// missing one ingredient, then two; ties by whole-basket cost, then name.
+// Personal recipes count whether or not "Include in automatic plans" is on
+// (this is a manual recommendation); drafts and anything without ingredients
+// never do. Recipes the user marked "not for me" are left out.
+function findCookableRecipes({ slot, servings, plan, target, pantry, diet, dislikedIds, templates = MEAL_TEMPLATES }) {
+  const out = [];
+  for (const t of templates) {
+    if (t.slot !== slot || t.draft || !Array.isArray(t.items) || t.items.length === 0) continue;
+    if (dislikedIds && dislikedIds.has(t.id)) continue;
+    if (!matchesDiet(t.items, diet)) continue;
+    const r = evaluateRecipe(t, servings, plan, target, pantry);
+    if (r.status !== "far") out.push(r);
+  }
+  const rank = { ready: 0, near: 1 };
+  out.sort((a, b) => rank[a.status] - rank[b.status] || a.missingCount - b.missingCount
+    || a.extraCost - b.extraCost || a.template.name.localeCompare(b.template.name));
+  return out;
 }

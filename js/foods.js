@@ -266,6 +266,14 @@ function formatServing(food, grams) {
   return `${formatQty(rounded)} ${unit}`;
 }
 
+// Math.ceil that ignores floating-point dust: 453.6g / 28.35 is
+// 16.000000000000004 oz, and a plain ceil would charge for a 17th ounce (or
+// a 1.25 lb package) for a recipe that needs exactly one pound. Real
+// overage under a millionth of a unit is never a real extra purchase.
+function ceilQtyExact(x) {
+  return Math.ceil(x - 1e-6);
+}
+
 // Rounds a food + total gram amount (summed across a whole week) up to a
 // real purchasable quantity — you can't buy a fraction of a physical
 // item, unlike formatServing (which rounds to the nearest fraction for
@@ -283,7 +291,7 @@ function roundUpToPurchase(food, grams) {
   if (grams <= 0) return { grams: 0, label: "0g" };
   if (food === "egg") {
     const eggs = grams / SERVING_UNITS.egg.grams;
-    const dozens = Math.ceil(eggs / 12);
+    const dozens = ceilQtyExact(eggs / 12);
     if (dozens <= 0) return { grams: 0, label: "0g" };
     return { grams: dozens * 12 * SERVING_UNITS.egg.grams, label: `${dozens} dozen eggs` };
   }
@@ -291,14 +299,14 @@ function roundUpToPurchase(food, grams) {
   if (!su) return { grams, label: `${Math.round(grams)}g` };
   const qty = grams / su.grams;
   if (su.unit === "oz") {
-    const oz = Math.ceil(qty);
+    const oz = ceilQtyExact(qty);
     if (oz >= 16) {
-      const lb = Math.ceil((oz / 16) * 4) / 4;
+      const lb = ceilQtyExact((oz / 16) * 4) / 4;
       return { grams: lb * 16 * su.grams, label: `${formatQty(lb)} lb` };
     }
     return { grams: oz * su.grams, label: `${oz} oz` };
   }
-  const ceilQty = Math.ceil(qty);
+  const ceilQty = ceilQtyExact(qty);
   if (ceilQty <= 0) return { grams: 0, label: "0g" };
   const unit = ceilQty > 1 && !su.noPlural ? (su.plural || `${su.unit}s`) : su.unit;
   return { grams: ceilQty * su.grams, label: `${formatQty(ceilQty)} ${unit}` };
@@ -314,4 +322,27 @@ function formatShoppingQty(food, grams) {
 // left over after shopping.
 function shoppingPurchaseGrams(food, grams) {
   return roundUpToPurchase(food, grams).grams;
+}
+
+// Kitchen units an ingredient row can be entered in. Storage stays grams —
+// the unit is only an input convenience — so nothing downstream changes.
+// Every food gets g and oz; the rest come from that food's own SERVING_UNITS
+// entry (its natural unit, plus cup/tbsp/tsp conversions for foods measured
+// in cups or tablespoons), so no new density data is invented.
+// Same ounce the shopping list uses (SERVING_UNITS), so "1 lb" entered here
+// is exactly 16 oz when it's priced.
+const GRAMS_PER_OZ = 28.35;
+function kitchenUnitOptions(food) {
+  const opts = [{ key: "g", label: "g", grams: 1 }, { key: "oz", label: "oz", grams: GRAMS_PER_OZ }];
+  const su = SERVING_UNITS[food];
+  if (su) {
+    if (su.unit === "cup") {
+      opts.push({ key: "cup", label: "cup", grams: su.grams }, { key: "tbsp", label: "tbsp", grams: su.grams / 16 }, { key: "tsp", label: "tsp", grams: su.grams / 48 });
+    } else if (su.unit === "tbsp") {
+      opts.push({ key: "tbsp", label: "tbsp", grams: su.grams }, { key: "tsp", label: "tsp", grams: su.grams / 3 }, { key: "cup", label: "cup", grams: su.grams * 16 });
+    } else if (su.unit !== "oz") {
+      opts.push({ key: su.unit, label: su.unit, grams: su.grams });
+    }
+  }
+  return opts;
 }

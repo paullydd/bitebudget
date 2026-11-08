@@ -378,7 +378,14 @@
         <h2>📖 Recipe Book</h2>
         <button type="button" id="addRecipeBtn" class="secondary-btn">✨ Add Your Recipe</button>
       </div>
-      <p class="wizard-hint">Every recipe in BiteBudget, browsable on its own — favorite or rule out anything here and it carries into your next plan, no need to wait for it to show up first. Add your own with real ingredients and it can be auto-planned and shopping-listed too, not just logged once.</p>
+      <div class="bubble-group recipe-book-tabs" id="recipeBookTabs" role="group" aria-label="Recipe Book view">
+        <button type="button" class="bubble selected" data-value="all">📖 All recipes</button>
+        <button type="button" class="bubble" data-value="mine">✨ My Recipes <span id="myRecipesTabCount"></span></button>
+        <button type="button" class="bubble" data-value="cook">🍳 What can I make?</button>
+      </div>
+
+      <div id="recipeBookAllView">
+      <p class="wizard-hint">Every recipe in BiteBudget, browsable on its own — favorite or rule out anything here and it carries into your next plan, no need to wait for it to show up first. Your own recipes show up here too, once they're complete.</p>
 
       <div class="form-row">
         <label for="recipeSearch">Search</label>
@@ -415,9 +422,62 @@
       <div class="form-row checkbox-row">
         <label><input type="checkbox" id="recipeDairyFree"> 🥛 Dairy-free</label>
       </div>
+      <div class="form-row checkbox-row">
+        <label><input type="checkbox" id="recipeFavoritesOnly"> ❤️ Favorites only</label>
+      </div>
 
       <p id="recipeBookCount" class="wizard-hint"></p>
       <div id="recipeBookList" class="recipe-book-grid"></div>
+      </div>
+
+      <div id="whatCanIMakeView" class="hidden">
+        <p class="wizard-hint">Pick lunches and dinners from what's already in your kitchen. Recipes you can cook right now come first, then ones that are one or two ingredients short, with what to buy and what it adds to your shopping basket. Your pantry is never changed unless you change it here.</p>
+        <div class="wcim-controls">
+          <div class="wizard-slot">
+            <div class="wizard-slot-label" id="wcimSlotLabel">Meal</div>
+            <div class="bubble-group" id="wcimSlot" role="group" aria-labelledby="wcimSlotLabel">
+              <button type="button" class="bubble" data-value="lunch">🥗 Lunch</button>
+              <button type="button" class="bubble selected" data-value="dinner">🍽️ Dinner</button>
+            </div>
+          </div>
+          <label class="wcim-field">Servings
+            <input type="number" id="wcimServings" min="1" max="24" step="1" value="1" inputmode="numeric">
+          </label>
+          <label class="wcim-field" id="wcimTargetField">For which meal in your plan?
+            <select id="wcimTarget"></select>
+          </label>
+        </div>
+        <details id="wcimPantry" class="wcim-pantry">
+          <summary id="wcimPantrySummary">🥫 Pantry</summary>
+          <div id="wcimPantryItems" class="pantry-list"></div>
+          <form id="wcimPantryAdd" class="wcim-pantry-add">
+            <select id="wcimPantryFood" aria-label="Food to add to your pantry"></select>
+            <input type="number" id="wcimPantryAmount" min="0" step="any" value="" placeholder="Amount" aria-label="Amount on hand">
+            <select id="wcimPantryUnit" aria-label="Unit"></select>
+            <button type="submit" class="secondary-btn">＋ Add to pantry</button>
+          </form>
+        </details>
+        <div id="wcimSummary" class="wizard-hint" aria-live="polite"></div>
+        <div id="wcimResults"></div>
+      </div>
+
+      <div id="myRecipesView" class="hidden">
+        <p class="wizard-hint">Your cookbook: recipes you've written and ones you've saved from Instagram, Pinterest, a website, pasted text or a screenshot. Save a link now and fill in the details whenever you're ready — a recipe joins your plans only once its ingredients, quantities and servings are confirmed.</p>
+        <div class="my-recipes-toolbar">
+          <button type="button" id="newPersonalRecipeBtn" class="primary-btn">＋ Save a recipe</button>
+        </div>
+        <div class="wizard-slot">
+          <div class="wizard-slot-label" id="myRecipesFilterLabel">Show</div>
+          <div class="bubble-group" id="myRecipesFilter" role="group" aria-labelledby="myRecipesFilterLabel">
+            <button type="button" class="bubble selected" data-value="all">All</button>
+            <button type="button" class="bubble" data-value="want">📝 Want to make</button>
+            <button type="button" class="bubble" data-value="made">✅ Made</button>
+            <button type="button" class="bubble" data-value="favorites">❤️ Favorites</button>
+          </div>
+        </div>
+        <p id="myRecipesCount" class="wizard-hint"></p>
+        <div id="myRecipesList" class="recipe-book-grid"></div>
+      </div>
     </section>
   </main>
 
@@ -491,11 +551,44 @@
     <div class="achievements-page">
       <button type="button" id="customRecipeCloseBtn" class="recipe-close" aria-label="Close">✕</button>
       <h2 id="customRecipeTitle">✨ Add Your Recipe</h2>
-      <p class="wizard-hint">Real ingredients, so it can be auto-planned, added to the shopping list, and cooked from — not just a one-off log.</p>
+      <p class="wizard-hint">Save a recipe however you have it — a link, pasted text, a screenshot, or typed in. Only a title is needed to save it as <strong>Want to make</strong>; add ingredients, quantities and servings when you're ready and it can go into your plans.</p>
       <form id="customRecipeForm">
         <div class="form-row">
           <label for="customRecipeName">Recipe name</label>
-          <input type="text" id="customRecipeName" placeholder="e.g. Mom's turkey chili" required>
+          <input type="text" id="customRecipeName" placeholder="e.g. Mom's turkey chili">
+        </div>
+        <fieldset class="custom-recipe-source">
+          <legend>📎 Source (optional)</legend>
+          <div class="form-row">
+            <label for="customRecipeSourceUrl">Link — Instagram, Pinterest, a website…</label>
+            <input type="text" id="customRecipeSourceUrl" inputmode="url" autocomplete="off" placeholder="https://…">
+            <p id="customRecipeLinkNote" class="macro-hint hidden"></p>
+          </div>
+          <div class="form-row">
+            <label for="customRecipeSourceText">Pasted recipe text</label>
+            <textarea id="customRecipeSourceText" rows="4" placeholder="Paste a caption or the recipe's ingredients and steps"></textarea>
+            <button type="button" id="customRecipeParseBtn" class="secondary-btn">✨ Fill in from pasted text</button>
+            <p id="customRecipeParseNote" class="macro-hint hidden"></p>
+          </div>
+          <div class="form-row">
+            <label for="customRecipeSourceImage">Screenshot</label>
+            <input type="file" id="customRecipeSourceImage" accept="image/*">
+            <div id="customRecipeImagePreview" class="custom-recipe-image-preview hidden">
+              <img alt="Saved recipe screenshot">
+              <button type="button" id="customRecipeImageRemove" class="secondary-btn">Remove screenshot</button>
+            </div>
+          </div>
+          <p class="macro-hint">BiteBudget keeps links, text and screenshots with the recipe but can't read a link or the words inside a picture — use them to fill in the details below.</p>
+          <a id="customRecipeOpenOriginal" class="open-original-link hidden" target="_blank" rel="noopener noreferrer">🔗 Open original</a>
+        </fieldset>
+        <div id="customRecipeUnmatched" class="custom-recipe-unmatched hidden">
+          <strong>These lines weren't added — add them by hand:</strong>
+          <ul id="customRecipeUnmatchedList"></ul>
+        </div>
+        <div class="form-row">
+          <label for="customRecipeYield">Makes how many servings?</label>
+          <input type="number" id="customRecipeYield" min="1" max="100" step="1" placeholder="Not set">
+          <p class="macro-hint">Enter the ingredients for the whole batch below. A 4-serving chili is planned as 1 serving = a quarter of it.</p>
         </div>
         <div class="wizard-slot">
           <div class="wizard-slot-label" id="customRecipeSlotLabel">Meal</div>
@@ -510,16 +603,69 @@
           <label>Ingredients</label>
           <div id="customRecipeIngredients" class="custom-recipe-ingredients"></div>
           <button type="button" id="customRecipeAddIngredientBtn" class="secondary-btn">+ Add ingredient</button>
-          <p id="customRecipeError" class="custom-recipe-error hidden">Add at least one ingredient with a quantity above 0g.</p>
+          <p id="customRecipeError" class="custom-recipe-error hidden"></p>
         </div>
         <p id="customRecipeNutritionPreview" class="macro-hint">0 kcal · P 0g · C 0g · F 0g · $0.00</p>
         <div class="form-row">
           <label for="customRecipeInstructions">Instructions (optional, one step per line)</label>
           <textarea id="customRecipeInstructions" rows="4" placeholder="1. ..."></textarea>
         </div>
+        <div class="form-row checkbox-row">
+          <label><input type="checkbox" id="customRecipeMade"> ✅ I've made this</label>
+        </div>
+        <div class="form-row checkbox-row">
+          <label><input type="checkbox" id="customRecipeAutoPlan"> 🔁 Include in automatic plans</label>
+        </div>
+        <p class="macro-hint">Off by default: the planner won't pick this recipe on its own. You can still place it yourself with Add to Plan.</p>
         <div class="custom-recipe-actions">
           <button type="button" id="customRecipeDeleteBtn" class="secondary-btn hidden">🗑️ Delete recipe</button>
-          <button type="submit" class="primary-btn">Save Recipe</button>
+          <button type="submit" id="customRecipeDraftBtn" class="secondary-btn" data-mode="draft">📝 Save as Want to make</button>
+          <button type="submit" id="customRecipeSaveBtn" class="primary-btn" data-mode="complete">Save Recipe</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="tweaksDialog" class="achievements-dialog custom-recipe-dialog tweaks-dialog">
+    <div class="achievements-page">
+      <button type="button" id="tweaksCloseBtn" class="recipe-close" aria-label="Close">✕</button>
+      <h2>💡 Suggest Tweaks</h2>
+      <p id="tweaksRecipeName" class="wizard-hint"></p>
+      <p id="tweaksContext" class="macro-hint"></p>
+      <div class="bubble-group" id="tweaksKinds" role="group" aria-label="Kind of tweak">
+        <button type="button" class="bubble selected" data-value="lowerCost">💲 Lower cost</button>
+        <button type="button" class="bubble" data-value="usePantry">🥫 Use what I have</button>
+        <button type="button" class="bubble" data-value="moreProtein">💪 More protein</button>
+        <button type="button" class="bubble" data-value="moreFiber">🌾 More fiber</button>
+      </div>
+      <p id="tweaksNote" class="macro-hint hidden"></p>
+      <div id="tweaksList"></div>
+    </div>
+  </dialog>
+
+  <dialog id="addToPlanDialog" class="achievements-dialog custom-recipe-dialog">
+    <div class="achievements-page">
+      <button type="button" id="addToPlanCloseBtn" class="recipe-close" aria-label="Close">✕</button>
+      <h2>📌 Add to Plan</h2>
+      <p id="addToPlanRecipeName" class="wizard-hint"></p>
+      <p id="addToPlanEmpty" class="custom-recipe-error hidden">Generate a plan first — then you can place recipes into it.</p>
+      <form id="addToPlanForm">
+        <div class="form-row">
+          <label for="addToPlanDay">Day</label>
+          <select id="addToPlanDay"></select>
+        </div>
+        <div class="form-row">
+          <label for="addToPlanSlot">Meal</label>
+          <select id="addToPlanSlot"></select>
+        </div>
+        <div class="form-row">
+          <label for="addToPlanServings">Servings</label>
+          <input type="number" id="addToPlanServings" min="1" max="24" step="1" value="1">
+        </div>
+        <p id="addToPlanPreview" class="macro-hint"></p>
+        <p id="addToPlanReplaces" class="macro-hint"></p>
+        <div class="custom-recipe-actions">
+          <button type="submit" class="primary-btn">Add to Plan</button>
         </div>
       </form>
     </div>
@@ -584,6 +730,7 @@
   <script src="js/foods.js"></script>
   <script src="js/meals.js"></script>
   <script src="js/planner.js"></script>
+  <script src="js/recipes.js"></script>
   <script src="js/app.js"></script>
   <script>
     if ("serviceWorker" in navigator) {

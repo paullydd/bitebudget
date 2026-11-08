@@ -136,7 +136,8 @@ body {
 .custom-meal-dialog #customMealForm { display: flex; flex-direction: column; gap: 14px; }
 .custom-meal-dialog .primary-btn { width: 100%; }
 .custom-recipe-dialog { max-width: 480px; }
-.custom-recipe-dialog #customRecipeForm { display: flex; flex-direction: column; gap: 14px; }
+.custom-recipe-dialog #customRecipeForm, .custom-recipe-dialog #addToPlanForm { display: flex; flex-direction: column; gap: 14px; }
+.custom-recipe-dialog #addToPlanForm.hidden { display: none; } /* id rule above would otherwise beat .hidden */
 .custom-recipe-dialog .primary-btn { flex: 1; }
 .custom-recipe-ingredients { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .custom-recipe-ingredient-row { display: flex; align-items: center; gap: 6px; }
@@ -159,7 +160,30 @@ body {
   color: var(--ink);
   text-align: right;
 }
-.custom-recipe-ingredient-row .unit-label { color: var(--muted); font-size: 0.85rem; }
+/* amount + unit: the food picker takes the slack, the unit stays compact */
+.custom-recipe-ingredient-row select.custom-recipe-unit-select { flex: 0 0 auto; width: 84px; }
+.custom-recipe-ingredient-row input[type="number"] { width: 72px; }
+.recipe-book-card-actions { display: flex; gap: 8px; }
+.recipe-book-card-actions button { flex: 1; width: auto; }
+.recipe-book-add-btn {
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.recipe-book-add-btn:hover { filter: brightness(0.95); }
+#addToPlanDialog select, #addToPlanDialog input[type="number"] {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-size: 0.95rem;
+}
 .custom-recipe-remove-ingredient {
   border: none;
   background: transparent;
@@ -614,6 +638,7 @@ form { display: flex; flex-direction: column; gap: 16px; }
   white-space: nowrap;
 }
 .week-overview-cell:hover, .week-overview-daylabel:hover { background: var(--hover-bg); }
+.week-overview-cell-unmatched { color: var(--bad); font-style: italic; }
 
 .meta-grid, .day-summary {
   display: grid;
@@ -744,6 +769,11 @@ form { display: flex; flex-direction: column; gap: 16px; }
 .pending-meal-card { border-style: dashed; background: transparent; }
 .pending-meal-note { color: var(--muted); font-size: 0.85rem; margin: 10px 0; }
 .pending-meal-card .custom-meal-btn { width: 100%; text-align: center; }
+
+.unmatched-meal-card { border-style: dashed; border-color: var(--bad); background: transparent; }
+.unmatched-meal-note { color: var(--bad); font-size: 0.85rem; margin: 10px 0; }
+.unmatched-meal-card .meal-head-actions { display: flex; gap: 8px; margin-top: 4px; }
+.unmatched-meal-card .meal-head-actions button { flex: 1; }
 .recipe-btn, .recipe-book-view-btn {
   border: 1px solid var(--border);
   background: var(--panel);
@@ -974,3 +1004,81 @@ footer .text-link-btn { display: inline-block; margin-top: 6px; font-size: 0.85r
     margin: 0 auto;
   }
 }
+
+
+/* ---------- Cookbook: My Recipes, sources, drafts, tweaks ---------- */
+.recipe-book-tabs { margin: 4px 0 14px; }
+.my-recipes-toolbar { display: flex; gap: 10px; margin: 8px 0 12px; }
+.my-recipes-toolbar .primary-btn { flex: 0 0 auto; }
+.my-recipe-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.status-chip {
+  font-size: 0.75rem; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel-alt); color: var(--ink);
+}
+.chip-draft { color: var(--bad); border-color: var(--bad); }
+.chip-made { color: var(--accent-dark); border-color: var(--accent); }
+.chip-version { color: var(--muted); }
+.recipe-missing { color: var(--bad); font-size: 0.82rem; margin: 4px 0 8px; }
+.my-recipe-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-size: 0.82rem; }
+.source-chip { color: var(--muted); }
+.my-recipe-thumb { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.open-original-link { color: var(--accent-dark); font-weight: 600; font-size: 0.85rem; text-decoration: underline; }
+.open-original-link.hidden { display: none; }
+.my-recipe-autoplan { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin: 6px 0; }
+.my-recipe-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.my-recipe-actions button { flex: 1 1 auto; width: auto; }
+.my-recipe-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.custom-recipe-source { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.custom-recipe-source legend { font-weight: 600; font-size: 0.9rem; padding: 0 6px; }
+.custom-recipe-source textarea, .custom-recipe-source input[type="text"] {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel-alt); color: var(--ink); font: inherit; width: 100%; box-sizing: border-box;
+}
+.custom-recipe-image-preview { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.custom-recipe-image-preview img { max-width: 120px; max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
+.custom-recipe-image-preview.hidden { display: none; }
+.custom-recipe-unmatched { border: 1px dashed var(--bad); border-radius: 10px; padding: 8px 12px; font-size: 0.85rem; }
+.custom-recipe-unmatched ul { margin: 6px 0 0; padding-left: 18px; }
+.custom-recipe-actions { flex-wrap: wrap; }
+.custom-recipe-actions button { flex: 1 1 auto; }
+.tweak-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 10px 0; background: var(--panel); }
+.tweak-changes { margin: 0 0 8px; padding-left: 18px; font-weight: 600; font-size: 0.9rem; }
+.tweak-compare { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 10px; }
+.tweak-compare th, .tweak-compare td { padding: 4px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+.tweak-compare th:first-child { text-align: left; font-weight: 500; color: var(--muted); }
+.tweak-better { color: var(--accent-dark); font-weight: 700; }
+.tweak-worse { color: var(--bad); font-weight: 700; }
+.tweak-card .tweak-save-btn { width: 100%; }
+
+/* ---- What can I make? ---- */
+.wcim-controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;margin:8px 0 12px}
+.wcim-field{display:flex;flex-direction:column;gap:4px;font-size:.9rem;font-weight:600}
+.wcim-field input,.wcim-field select{font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:inherit;max-width:100%}
+.wcim-field input{width:6rem}
+.wcim-pantry{border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin:0 0 12px}
+.wcim-pantry summary{cursor:pointer;font-weight:600}
+.wcim-pantry-add{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.wcim-pantry-add select,.wcim-pantry-add input{font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:inherit;max-width:100%}
+.wcim-pantry-add input{width:7rem}
+.wcim-group-title{font-size:1.05rem;margin:18px 0 8px}
+.wcim-card .wcim-status{display:inline-block;font-size:.8rem;font-weight:700;padding:2px 10px;border-radius:999px;margin:4px 0}
+.wcim-status.ready{background:#e3f1e5;color:#1f6b33}
+.wcim-status.near{background:#fdf0dc;color:#8a5200}
+.wcim-short{list-style:none;margin:6px 0;padding:0;font-size:.9rem}
+.wcim-short li{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:6px 0;border-top:1px solid var(--border)}
+.wcim-short .wcim-short-main{flex:1 1 14rem}
+.wcim-short .wcim-short-note{display:block;color:var(--muted);font-size:.82rem}
+.wcim-extra{font-size:.9rem;margin:6px 0}
+.wcim-have-btn{font:inherit;font-size:.82rem;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:inherit;cursor:pointer}
+.wcim-more{margin:10px 0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .wcim-status.ready{background:#1d3a25;color:#9fe0b0}:root:not([data-theme="light"]) .wcim-status.near{background:#43330f;color:#f3cf8a}}
+:root[data-theme="dark"] .wcim-status.ready{background:#1d3a25;color:#9fe0b0}
+:root[data-theme="dark"] .wcim-status.near{background:#43330f;color:#f3cf8a}
+.wcim-field.hidden{display:none}
+.wcim-pantry-add select,.wcim-pantry-add input,.wcim-pantry-add button{width:auto;margin:0}
+.wcim-pantry-add #wcimPantryFood{flex:1 1 12rem}
+.pantry-suggested-row{flex-wrap:wrap;gap:8px}
+.pantry-confirm-amount{width:5.5rem;font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:inherit}
+.pantry-confirm-unit{width:auto;font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:inherit}
+.pantry-confirm-btn{font:inherit;font-size:.85rem;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--panel-alt);color:var(--accent-dark);font-weight:600;cursor:pointer}
+.pantry-confirm-btn:hover{background:var(--hover-bg)}

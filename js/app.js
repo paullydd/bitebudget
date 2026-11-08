@@ -18,6 +18,450 @@ const PRICE_OVERRIDES_KEY = "biteBudget.priceOverrides.v1";
 // $X.XX)" next to each field and power "reset to defaults".
 const DEFAULT_PRICES = Object.fromEntries(Object.keys(FOODS).map(k => [k, FOODS[k].price]));
 const RECIPES_TRIED_KEY = "biteBudget.recipesTried.v1";
+
+// ---------------------------------------------------------------------------
+// Backup import validation
+//
+// A backup file is untrusted input: it can be hand-edited, truncated, copied
+// from another version, or crafted. So nothing in it reaches localStorage
+// as-is — every value is parsed, checked against what the app itself would
+// have written, and REBUILT from known fields (unknown fields are dropped).
+// A value that fails its check is skipped and the current value for that key
+// is left untouched; nothing is repaired by guessing.
+// ---------------------------------------------------------------------------
+
+// A generous upper bound for any one text field pulled from an imported
+// backup — long enough for a real recipe name/step, short enough that a
+// hand-edited or malicious file can't bloat storage or the DOM with it.
+// Only the free-text note keeps a ceiling (its input has maxlength=120).
+// Recipes, steps, names and lists are user-authored with no limit in the
+// editor, so the importer must not invent one — a backup has to restore
+// everything the app itself was willing to save.
+const IMPORT_NOTE_MAX_LEN = 2000;
+// "Makes X servings" bounds — the recipe editor's input uses the same max.
+const RECIPE_YIELD_MAX = 100;
+// Servings a recipe can be placed with via Add to Plan (the dialog's max).
+const PLACE_SERVINGS_MAX = 24;
+// Cap on how many entries any one imported list (history, favorites, ...) may hold.
+// Recipe/meal ids end up inside HTML attributes and CSS selectors. The app
+// only ever generates ids from this alphabet (built-ins like "b1", user
+// ones like "custom-recipe-1730000000000"), so anything else in a backup is
+// rejected outright rather than trusted and escaped.
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
+// Preference values (protein families, meal styles) are fixed lower_snake
+// tokens that get interpolated into selectors.
+const TOKEN_PATTERN = /^[a-z0-9_]{1,40}$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const BUDGET_PERIODS = ["daily", "weekly", "monthly"];
+
+function isFiniteNumber(v) {
+  return typeof v === "number" && Number.isFinite(v);
+}
+function inRange(v, min, max) {
+  return isFiniteNumber(v) && v >= min && v <= max;
+}
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+function hasOwn(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+// Own-property check, deliberately NOT `FOODS[x]` truthiness: FOODS["constructor"]
+// and FOODS["toString"] are truthy through the prototype chain, which would
+// let a backup reference a "food" with no nutrition data and turn every
+// downstream sum into NaN.
+function isKnownFood(food) {
+  return typeof food === "string" && hasOwn(FOODS, food);
+}
+function parseJson(str) {
+  try { return JSON.parse(str); } catch { return undefined; }
+}
+
+// Shared by the recipe and plan-meal validators so the two can't disagree
+// about what a well-formed ingredient list or step list is. Well-formed
+// means: known foods, positive finite grams, strings for steps. No size
+// limits — the recipe editor has none.
+function cleanIngredientItems(raw, { allowZero = false } = {}) {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const items = [];
+  for (const item of raw) {
+    if (!isPlainObject(item) || !isKnownFood(item.food) || !isFiniteNumber(item.grams)) return null;
+    if (allowZero ? item.grams < 0 : item.grams <= 0) return null;
+    items.push({ food: item.food, grams: item.grams });
+  }
+  return items;
+}
+function cleanInstructionSteps(raw) {
+  if (!Array.isArray(raw)) return null;
+  const steps = [];
+  for (const step of raw) {
+    if (typeof step !== "string") return null;
+    steps.push(step);
+  }
+  return steps;
+}
+function isNonNegative(v) {
+  return isFiniteNumber(v) && v >= 0;
+}
+
+// Validates one recipe record before it's allowed into customRecipes — the
+// shape the recipe editor writes ({id, slot, name, yieldServings?, items,
+// instructions} plus the optional cookbook fields: draft, autoPlan, made,
+// madeAt, createdAt, versionOf, tweak, source, unmatched). `takenIds` holds
+// every id already in use (built-in recipes plus earlier records in this
+// same import) so an imported recipe can't shadow a built-in one or
+// duplicate another. Returns a clean copy, or null to drop the record.
+// Records saved before the cookbook fields existed have none of them and
+// validate exactly as they always did.
+function validateImportedRecipe(r, takenIds) {
+  if (!isPlainObject(r)) return null;
+  if (typeof r.id !== "string" || !ID_PATTERN.test(r.id) || takenIds.has(r.id)) return null;
+  if (typeof r.name !== "string" || !r.name.trim()) return null;
+  if (!SLOT_ORDER.includes(r.slot)) return null;
+  const isDraft = r.draft === true;
+  // A "Want to make" draft may have no ingredients yet; anything else needs them.
+  let items;
+  if (isDraft && (r.items === undefined || (Array.isArray(r.items) && r.items.length === 0))) items = [];
+  else items = cleanIngredientItems(r.items);
+  if (!items) return null;
+  const instructions = r.instructions === undefined ? [] : cleanInstructionSteps(r.instructions);
+  if (!instructions) return null;
+  // yieldServings: absent = legacy recipe (one serving, left absent so a
+  // restored legacy recipe stays byte-identical). Present but not a whole
+  // number in the editor's own 1-100 range = malformed, record dropped —
+  // silently defaulting would change how much of the recipe gets planned.
+  let yieldServings;
+  if (r.yieldServings !== undefined) {
+    if (!Number.isInteger(r.yieldServings) || r.yieldServings < 1 || r.yieldServings > RECIPE_YIELD_MAX) return null;
+    yieldServings = r.yieldServings;
+  }
+
+  // Cookbook fields: a malformed optional field is dropped, not the recipe.
+  const extra = {};
+  if (isDraft) extra.draft = true;
+  if (typeof r.autoPlan === "boolean") extra.autoPlan = r.autoPlan;
+  if (r.made === true) {
+    extra.made = true;
+    if (isFiniteNumber(r.madeAt)) extra.madeAt = r.madeAt;
+  }
+  if (isFiniteNumber(r.createdAt)) extra.createdAt = r.createdAt;
+  if (typeof r.versionOf === "string" && ID_PATTERN.test(r.versionOf)) extra.versionOf = r.versionOf;
+  if (isPlainObject(r.tweak) && typeof r.tweak.kind === "string" && typeof r.tweak.summary === "string") {
+    extra.tweak = { kind: r.tweak.kind, summary: r.tweak.summary };
+  }
+  if (isPlainObject(r.source)) {
+    const source = {};
+    if (typeof r.source.url === "string") {
+      const link = parseRecipeLink(r.source.url);
+      if (link) source.url = link.href; // http(s) only: never javascript:, data:, file:
+    }
+    if (typeof r.source.text === "string" && r.source.text) source.text = r.source.text;
+    if (typeof r.source.image === "string" && DATA_URL_IMAGE.test(r.source.image)) source.image = r.source.image;
+    if (Object.keys(source).length) extra.source = source;
+  }
+  if (Array.isArray(r.unmatched)) {
+    const lines = r.unmatched.filter(l => typeof l === "string" && l.trim());
+    if (lines.length) extra.unmatched = lines;
+  }
+
+  takenIds.add(r.id);
+  // Same key order the recipe editor writes (orderedRecipeRecord), so a
+  // restored recipe is byte-identical to the original.
+  return orderedRecipeRecord({ id: r.id, slot: r.slot, name: r.name.trim(), yieldServings, items, instructions, ...extra });
+}
+
+function validateImportedRecipeList(list) {
+  if (!Array.isArray(list)) return null;
+  const takenIds = new Set(MEAL_TEMPLATES.filter(t => !t.userRecipe).map(t => t.id));
+  return list.map(r => validateImportedRecipe(r, takenIds)).filter(Boolean);
+}
+
+// One logged "my meal" record (name + macros). Returns a clean copy, or null.
+function validateImportedMyMeal(m) {
+  if (!isPlainObject(m)) return null;
+  if (typeof m.name !== "string" || !m.name.trim()) return null;
+  if (!isNonNegative(m.protein) || !isNonNegative(m.carbs) || !isNonNegative(m.fat)) return null;
+  const cost = isNonNegative(m.cost) ? m.cost : 0;
+  return { name: m.name.trim(), protein: m.protein, carbs: m.carbs, fat: m.fat, cost };
+}
+
+function validateImportedMyMealList(list) {
+  if (!Array.isArray(list)) return null;
+  return list.map(validateImportedMyMeal).filter(Boolean);
+}
+
+function cleanMacroSplit(raw) {
+  if (!isPlainObject(raw)) return null;
+  const { protein, carbs, fat } = raw;
+  if (![protein, carbs, fat].every(v => inRange(v, 0, 100))) return null;
+  return { protein, carbs, fat };
+}
+
+// {breakfast, lunch, dinner, snack} -> each a 0-7 whole-number count.
+function cleanMealPrep(raw) {
+  const src = raw === undefined ? {} : raw;
+  if (!isPlainObject(src)) return null;
+  const out = {};
+  for (const slot of SLOT_ORDER) {
+    const n = src[slot] === undefined ? 0 : src[slot];
+    if (!Number.isInteger(n) || n < 0 || n > 7) return null;
+    out[slot] = n;
+  }
+  return out;
+}
+
+// What readSettings() writes. startup feeds this straight into
+// writeSettingsToForm, which dereferences s.macroSplit.* — so a settings
+// value of the wrong shape would throw on every load.
+function validateImportedSettings(s) {
+  if (!isPlainObject(s)) return null;
+  const macroSplit = cleanMacroSplit(s.macroSplit);
+  const mealPrep = cleanMealPrep(s.mealPrep);
+  const servings = s.servings === undefined ? 1 : s.servings;
+  if (!macroSplit || !mealPrep) return null;
+  if (!Number.isInteger(s.days) || !inRange(s.days, 1, 14)) return null;
+  if (!inRange(s.dailyCalories, 800, 10000)) return null;
+  if (!BUDGET_PERIODS.includes(s.budgetPeriod)) return null;
+  if (!inRange(s.budgetAmount, 1, 100000)) return null;
+  if (![1, 2].includes(s.snacksPerDay)) return null;
+  if (!Number.isInteger(servings) || !inRange(servings, 1, 12)) return null;
+  return {
+    days: s.days, dailyCalories: s.dailyCalories, macroSplit,
+    budgetPeriod: s.budgetPeriod, budgetAmount: s.budgetAmount, snacksPerDay: s.snacksPerDay,
+    vegetarianOnly: s.vegetarianOnly === true, glutenFree: s.glutenFree === true, dairyFree: s.dairyFree === true,
+    servings, trackCalories: s.trackCalories !== false, mealPrep,
+  };
+}
+
+// Preferences. seedSignatureFields interpolates signature.slot/preset into a
+// querySelector string at startup, and the planner calls .includes/.some on
+// every list — so each field must be exactly the type and alphabet the
+// onboarding wizard produces, or startup / planning throws.
+function cleanTokenList(v) {
+  if (!Array.isArray(v) || v.length > 20) return null;
+  return v.every(x => typeof x === "string" && TOKEN_PATTERN.test(x)) ? v.slice() : null;
+}
+
+function validateImportedPrefs(p) {
+  if (!isPlainObject(p)) return null;
+  const out = {};
+  for (const field of ["proteins", "dislikedProteins"]) {
+    if (p[field] === undefined) continue;
+    const list = cleanTokenList(p[field]);
+    if (!list) return null;
+    out[field] = list;
+  }
+  if (p.missingAppliances !== undefined) {
+    if (!Array.isArray(p.missingAppliances) || !p.missingAppliances.every(a => ALL_APPLIANCES.includes(a))) return null;
+    out.missingAppliances = p.missingAppliances.slice();
+  }
+  for (const field of ["mealStyle", "excludedMealStyle"]) {
+    if (p[field] === undefined) continue;
+    if (!isPlainObject(p[field])) return null;
+    const bySlot = {};
+    for (const [slot, list] of Object.entries(p[field])) {
+      const clean = cleanTokenList(list);
+      if (!SLOT_ORDER.includes(slot) || !clean) return null;
+      bySlot[slot] = clean;
+    }
+    out[field] = bySlot;
+  }
+  if (p.signature !== undefined) {
+    const sg = p.signature;
+    if (!isPlainObject(sg)) return null;
+    const slot = sg.slot === undefined ? null : sg.slot;
+    const preset = sg.preset === undefined ? null : sg.preset;
+    if (slot !== null && !SLOT_ORDER.includes(slot)) return null;
+    if (preset !== null && !(typeof preset === "string" && hasOwn(SIGNATURE_PRESETS, preset))) return null;
+    out.signature = { slot, preset, note: typeof sg.note === "string" ? sg.note.slice(0, IMPORT_NOTE_MAX_LEN) : "" };
+  }
+  return out;
+}
+
+// {food: grams} — only foods the app knows, only sane amounts.
+function validateImportedPantry(p) {
+  if (!isPlainObject(p)) return null;
+  const out = {};
+  for (const [food, g] of Object.entries(p)) {
+    if (isKnownFood(food) && isNonNegative(g)) out[food] = g;
+  }
+  return out;
+}
+
+// {food: pricePer100g}
+function validateImportedPriceOverrides(p) {
+  if (!isPlainObject(p)) return null;
+  const out = {};
+  for (const [food, price] of Object.entries(p)) {
+    if (isKnownFood(food) && isNonNegative(price)) out[food] = price;
+  }
+  return out;
+}
+
+function validateImportedHistory(h) {
+  if (!Array.isArray(h)) return null;
+  return h
+    .filter(e => isPlainObject(e) && typeof e.date === "string" && DATE_PATTERN.test(e.date)
+      && inRange(e.days, 0, 400) && inRange(e.totalBudget, 0, 1e7) && inRange(e.totalCost, 0, 1e7))
+    .map(e => ({ date: e.date, days: e.days, totalBudget: e.totalBudget, totalCost: e.totalCost }));
+}
+
+// Favorites / disliked / tried-recipes: lists of recipe ids. Bad entries are
+// dropped; the list itself must be an array (loaders do `new Set(list)`).
+function validateImportedIdList(list) {
+  if (!Array.isArray(list)) return null;
+  return [...new Set(list.filter(x => typeof x === "string" && ID_PATTERN.test(x)))]
+}
+
+function validateImportedCheckedItems(list) {
+  if (!Array.isArray(list)) return null;
+  return [...new Set(list.filter(isKnownFood))]
+}
+
+// One meal inside a saved plan. Rebuilt from known fields for each of the
+// three kinds a plan can hold (auto-picked recipe, logged "custom" meal,
+// unmatched placeholder). Nutrition for recipe meals is recomputed from the
+// validated items rather than trusted. Returns a clean meal, or null.
+function validateImportedPlanMeal(m) {
+  if (!isPlainObject(m) || !SLOT_ORDER.includes(m.slot)) return null;
+
+  if (m.custom === true) {
+    if (typeof m.id !== "string" || !ID_PATTERN.test(m.id)) return null;
+    if (typeof m.name !== "string" || !m.name) return null;
+    if (!isPlainObject(m.nutrition)) return null;
+    const nutrition = {};
+    for (const k of ["cal", "protein", "carbs", "fat", "cost"]) {
+      if (!isNonNegative(m.nutrition[k])) return null;
+      nutrition[k] = m.nutrition[k];
+    }
+    return { slot: m.slot, id: m.id, name: m.name, items: [], instructions: [], custom: true, pending: m.pending === true, nutrition };
+  }
+
+  const servings = m.servings === undefined ? 1 : m.servings;
+  if (!Number.isInteger(servings) || !inRange(servings, 1, PLACE_SERVINGS_MAX)) return null;
+
+  if (m.unmatched === true) {
+    return {
+      slot: m.slot, id: null, name: null, items: [], instructions: [],
+      nutrition: { cal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 },
+      servings, prepTime: null, cookTime: null, prepped: false,
+      unmatched: true,
+      unmatchedReason: typeof m.unmatchedReason === "string" ? m.unmatchedReason : "",
+    };
+  }
+
+  if (typeof m.id !== "string" || !ID_PATTERN.test(m.id)) return null;
+  if (typeof m.name !== "string" || !m.name) return null;
+  // Plan items are already scaled to the day's calorie target and servings,
+  // so tiny or large gram values are normal here; only the shape is checked.
+  const items = cleanIngredientItems(m.items, { allowZero: true });
+  if (!items) return null;
+  const instructions = cleanInstructionSteps(m.instructions);
+  if (!instructions) return null;
+  const n = computeNutrition(items);
+  return {
+    slot: m.slot, id: m.id, name: m.name, items, instructions, servings,
+    nutrition: { cal: n.cal / servings, protein: n.protein / servings, carbs: n.carbs / servings, fat: n.fat / servings, cost: n.cost },
+    prepTime: isFiniteNumber(m.prepTime) ? m.prepTime : null,
+    cookTime: isFiniteNumber(m.cookTime) ? m.cookTime : null,
+    prepped: m.prepped === true,
+    ...(m.placed === true ? { placed: true } : {}),
+  };
+}
+
+// The saved plan. Startup runs recomputeAllCosts + renderPlan over it, which
+// walk every day, meal, item and summary field — so the whole structure is
+// validated strictly and rebuilt; if any part is bad the plan is skipped (a
+// plan is regenerable, a half-trusted one is not worth the risk). Day
+// numbers, totals and the shopping list are derived, never taken from the file.
+function validateImportedPlan(r) {
+  if (!isPlainObject(r) || !Array.isArray(r.plan) || r.plan.length < 1 || r.plan.length > 14) return null;
+  const s = r.summary;
+  if (!isPlainObject(s)) return null;
+  const macroSplit = cleanMacroSplit(s.macroSplit);
+  const mealPrep = cleanMealPrep(s.mealPrep);
+  const servings = s.servings === undefined ? 1 : s.servings;
+  if (!macroSplit || !mealPrep) return null;
+  if (!inRange(s.dailyCalories, 800, 10000) || !inRange(s.dailyBudget, 0, 1e6) || !inRange(s.totalBudget, 0, 1e7)) return null;
+  if (![1, 2].includes(s.snacksPerDay)) return null;
+  if (!Number.isInteger(servings) || !inRange(servings, 1, 12)) return null;
+
+  const plan = [];
+  for (let i = 0; i < r.plan.length; i++) {
+    const day = r.plan[i];
+    if (!isPlainObject(day) || !Array.isArray(day.meals) || day.meals.length < 1 || day.meals.length > 8) return null;
+    const meals = [];
+    for (const m of day.meals) {
+      const clean = validateImportedPlanMeal(m);
+      if (!clean) return null;
+      meals.push(clean);
+    }
+    const cleanDay = { day: i + 1, meals, totals: null };
+    recomputeDayTotals(cleanDay);
+    plan.push(cleanDay);
+  }
+
+  const shoppingList = buildShoppingList(plan, {});
+  return {
+    plan, shoppingList,
+    summary: {
+      totalCost: shoppingList.reduce((sum, item) => sum + item.cost, 0),
+      totalBudget: s.totalBudget, dailyBudget: s.dailyBudget, dailyCalories: s.dailyCalories, macroSplit,
+      days: plan.length, snacksPerDay: s.snacksPerDay,
+      vegetarianOnly: s.vegetarianOnly === true, glutenFree: s.glutenFree === true, dairyFree: s.dairyFree === true,
+      servings, trackCalories: s.trackCalories !== false, mealPrep, mealPrepEnabled: s.mealPrepEnabled === true,
+    },
+  };
+}
+
+// Per-key import rules: key -> (rawStoredString) => { value: string, dropped: n } | null.
+// The ONLY keys an import may write; anything else in a file is ignored.
+// `dropped` counts list entries thrown away inside an otherwise-accepted
+// value (e.g. one bad recipe out of five) so the user can be told.
+function jsonValidator(fn) {
+  return (str) => {
+    const raw = parseJson(str);
+    if (raw === undefined) return null;
+    const clean = fn(raw);
+    if (clean === null || clean === undefined) return null;
+    const dropped = Array.isArray(raw) && Array.isArray(clean) ? Math.max(0, raw.length - clean.length) : 0;
+    return { value: JSON.stringify(clean), dropped };
+  };
+}
+// A few keys store a bare string rather than JSON (theme: dark, fontScale: 112).
+function rawValidator(fn) {
+  return (str) => {
+    const clean = fn(str);
+    return clean === null ? null : { value: clean, dropped: 0 };
+  };
+}
+
+const IMPORT_VALIDATORS = {
+  [STORAGE_KEY]: jsonValidator(validateImportedSettings),
+  [PLAN_KEY]: jsonValidator(validateImportedPlan),
+  [PREFS_KEY]: jsonValidator(validateImportedPrefs),
+  [PANTRY_KEY]: jsonValidator(validateImportedPantry),
+  [HISTORY_KEY]: jsonValidator(validateImportedHistory),
+  [PRICE_OVERRIDES_KEY]: jsonValidator(validateImportedPriceOverrides),
+  [MY_MEALS_KEY]: jsonValidator(validateImportedMyMealList),
+  [CUSTOM_RECIPES_KEY]: jsonValidator(validateImportedRecipeList),
+  [FAVORITES_KEY]: jsonValidator(validateImportedIdList),
+  [DISLIKED_RECIPES_KEY]: jsonValidator(validateImportedIdList),
+  [RECIPES_TRIED_KEY]: jsonValidator(validateImportedIdList),
+  [SHOPPING_CHECKED_KEY]: jsonValidator(validateImportedCheckedItems),
+  [THEME_KEY]: rawValidator(v => (v === "light" || v === "dark" ? v : null)),
+  [FONT_SCALE_KEY]: rawValidator(v => (FONT_SCALES.includes(Number(v)) && String(v).trim() !== "" ? String(Number(v)) : null)),
+  [ONBOARDED_KEY]: rawValidator(v => (v === "1" ? v : null)),
+};
+
+// Friendly names for the "couldn't import" note.
+const IMPORT_LABELS = {
+  [STORAGE_KEY]: "settings", [PLAN_KEY]: "saved plan", [PREFS_KEY]: "preferences", [PANTRY_KEY]: "pantry",
+  [HISTORY_KEY]: "history", [PRICE_OVERRIDES_KEY]: "custom prices", [MY_MEALS_KEY]: "saved meals",
+  [CUSTOM_RECIPES_KEY]: "your recipes", [FAVORITES_KEY]: "favorites", [DISLIKED_RECIPES_KEY]: "not-for-me recipes",
+  [RECIPES_TRIED_KEY]: "recipes tried", [SHOPPING_CHECKED_KEY]: "shopping checkmarks",
+  [THEME_KEY]: "theme", [FONT_SCALE_KEY]: "text size", [ONBOARDED_KEY]: "onboarding status",
+};
 // How many days a plan can sit before nudging "ready to plan next week?" —
 // loose enough that a plan generated mid-week (not always on the same day)
 // doesn't get flagged early, but still lands well inside a second week.
@@ -526,7 +970,7 @@ function isFavorite(templateId) {
 }
 
 function setFavoriteButtonsState(templateId, nowFavorite) {
-  document.querySelectorAll(`.favorite-btn[data-template-id="${templateId}"]`).forEach(btn => {
+  document.querySelectorAll(`.favorite-btn[data-template-id="${CSS.escape(templateId)}"]`).forEach(btn => {
     btn.textContent = nowFavorite ? "❤️" : "🤍";
     btn.classList.toggle("active", nowFavorite);
     btn.setAttribute("aria-label", nowFavorite ? "Remove from favorites" : "Favorite this meal");
@@ -536,6 +980,10 @@ function setFavoriteButtonsState(templateId, nowFavorite) {
     $("#recipeFavoriteBtn").textContent = nowFavorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
     $("#recipeFavoriteBtn").classList.toggle("active", nowFavorite);
   }
+  // With "Favorites only" on, un-hearting a recipe should drop it from the list.
+  const favOnly = document.querySelector("#recipeFavoritesOnly");
+  if (favOnly && favOnly.checked) renderRecipeBook();
+  if (myRecipesFilterValue() === "favorites" && !document.querySelector("#myRecipesView").classList.contains("hidden")) renderMyRecipes();
 }
 
 // Toggles one template's favorite state and updates every visible button
@@ -575,7 +1023,7 @@ function isDislikedRecipe(templateId) {
 }
 
 function setDislikeButtonsState(templateId, nowDisliked) {
-  document.querySelectorAll(`.dislike-btn[data-template-id="${templateId}"]`).forEach(btn => {
+  document.querySelectorAll(`.dislike-btn[data-template-id="${CSS.escape(templateId)}"]`).forEach(btn => {
     btn.classList.toggle("active", nowDisliked);
     btn.setAttribute("aria-label", nowDisliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again");
     btn.setAttribute("aria-pressed", nowDisliked ? "true" : "false");
@@ -710,7 +1158,7 @@ function saveRecipesTried(tried) {
 
 function recordRecipesTried(plan) {
   const tried = loadRecipesTried();
-  plan.forEach(day => day.meals.forEach(m => { if (!m.custom) tried.add(m.id); }));
+  plan.forEach(day => day.meals.forEach(m => { if (!m.custom && !m.unmatched) tried.add(m.id); }));
   saveRecipesTried(tried);
 }
 
@@ -848,6 +1296,22 @@ function macroTargetGrams(dailyCalories, split) {
 const money = (n) => `$${n.toFixed(2)}`;
 const grams = (n) => `${Math.round(n)}g`;
 
+// Escapes text before it's inserted into any innerHTML template string, so
+// a saved recipe name/step/ingredient (typed by the user, pasted from
+// somewhere else, or loaded from an imported backup file) can never be
+// interpreted as markup or run as script. Used anywhere user-authored
+// recipe text reaches the DOM: the recipe modal, print layout, and
+// anywhere a saved recipe's fields are rendered.
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Builds a "⏱ 10 min prep · 12 min cook" segment (or just "⏱ 5 min" when
 // there's nothing to cook) — undefined for custom/logged meals, which have
 // no prepTime/cookTime since they're not a recipe template.
@@ -881,11 +1345,590 @@ function checkBudgetFeasibility() {
   }
 }
 
+// ---------- My Recipes (the personal cookbook view) ----------
+
+function myRecipesFilterValue() {
+  return document.querySelector("#myRecipesFilter .bubble.selected")?.dataset.value || "all";
+}
+
+function updateMyRecipesTabCount() {
+  const el = document.querySelector("#myRecipesTabCount");
+  if (el) {
+    const n = loadCustomRecipes().length;
+    el.textContent = n ? `(${n})` : "";
+  }
+}
+
+// The shopping list discounts the pantry when it's built, so a pantry edit
+// has to rebuild it or the list keeps showing the old amounts. Called after
+// every pantry change (the Pantry dialog and What can I make?).
+function syncPlanWithPantry() {
+  updatePantryButtonBadge();
+  if (currentPlanResult) commitPlanMutation(() => recomputeAllCosts(currentPlanResult, loadPantry()));
+}
+
+// ---- What can I make?
+const WCIM_PAGE_SIZE = 12;
+const wcim = { slot: "dinner", targetKey: "", shown: { ready: WCIM_PAGE_SIZE, near: WCIM_PAGE_SIZE }, ready: false };
+let wcimResults = [];
+
+function wcimServings() {
+  const s = Math.round(Number($("#wcimServings").value) || 1);
+  return Math.min(PLACE_SERVINGS_MAX, Math.max(1, s));
+}
+
+function wcimIsOpenMeal(m) {
+  return !!(m.unmatched || (m.custom && m.pending));
+}
+
+// The plan slots of the chosen meal type this could go into, labelled with
+// what's there now. Placing into a filled slot replaces it, which is why
+// its ingredients are released before the recipe is checked.
+function wcimTargetOptions() {
+  if (!currentPlanResult) return [];
+  const opts = [];
+  currentPlanResult.plan.forEach((day, di) => {
+    day.meals.forEach((m, mi) => {
+      if (m.slot !== wcim.slot) return;
+      const open = wcimIsOpenMeal(m);
+      const what = open ? "open" : `replaces ${m.custom ? "your logged meal " : ""}${m.name}`;
+      opts.push({ key: `${di}:${mi}`, dayIndex: di, mealIndex: mi, open, label: `Day ${day.day} · ${wcim.slot.charAt(0).toUpperCase() + wcim.slot.slice(1)} (${what})` });
+    });
+  });
+  return opts;
+}
+
+function wcimTarget() {
+  const opt = wcimTargetOptions().find(o => o.key === wcim.targetKey);
+  return opt ? { dayIndex: opt.dayIndex, mealIndex: opt.mealIndex } : null;
+}
+
+function wcimFillTargets({ fresh }) {
+  const opts = wcimTargetOptions();
+  $("#wcimTargetField").classList.toggle("hidden", opts.length === 0);
+  if (!opts.some(o => o.key === wcim.targetKey)) {
+    wcim.targetKey = fresh || wcim.targetKey === "" ? ((opts.find(o => o.open) || {}).key || "") : "";
+  }
+  $("#wcimTarget").innerHTML = [`<option value="">Just an extra meal (check against everything planned)</option>`]
+    .concat(opts.map(o => `<option value="${o.key}">${escapeHtml(o.label)}</option>`)).join("");
+  $("#wcimTarget").value = wcim.targetKey;
+}
+
+function renderWcimPantry() {
+  const pantry = loadPantry();
+  const entries = Object.entries(pantry).filter(([f]) => FOODS[f]);
+  $("#wcimPantrySummary").textContent = `🥫 Pantry — ${entries.length} item${entries.length === 1 ? "" : "s"} · tap to update what you have`;
+  $("#wcimPantryItems").innerHTML = entries.length ? entries.map(([food, g]) => `
+    <div class="pantry-row">
+      <span class="pantry-row-name">${escapeHtml(FOODS[food].name)}</span>
+      <span class="pantry-row-hint">${escapeHtml(formatServing(food, g))}</span>
+      <input type="number" class="wcim-pantry-input" data-food="${escapeHtml(food)}" value="${Math.round(g)}" min="0" aria-label="${escapeHtml(FOODS[food].name)} on hand, in grams"> g
+      <button type="button" class="pantry-remove-btn wcim-pantry-remove" data-food="${escapeHtml(food)}" aria-label="Remove ${escapeHtml(FOODS[food].name)} from pantry">✕</button>
+    </div>`).join("") : `<p class="pantry-empty">Nothing in your pantry yet — add what you have below.</p>`;
+  const sel = $("#wcimPantryFood");
+  if (!sel.options.length) {
+    sel.innerHTML = `<option value="">Choose a food…</option>` + Object.keys(FOODS)
+      .sort((a, b) => FOODS[a].name.localeCompare(FOODS[b].name))
+      .map(f => `<option value="${escapeHtml(f)}">${escapeHtml(FOODS[f].name)}</option>`).join("");
+  }
+  fillWcimUnits();
+}
+
+function fillWcimUnits() {
+  const food = $("#wcimPantryFood").value;
+  const units = food ? kitchenUnitOptions(food) : [{ key: "g", label: "g", grams: 1 }];
+  const prev = $("#wcimPantryUnit").value;
+  $("#wcimPantryUnit").innerHTML = units.map(u => `<option value="${u.key}" data-grams="${u.grams}">${escapeHtml(u.label)}</option>`).join("");
+  if (units.some(u => u.key === prev)) $("#wcimPantryUnit").value = prev;
+}
+
+function formatShort(s) {
+  return escapeHtml(formatServing(s.food, s.shortGrams));
+}
+
+function renderWcimCard(r) {
+  const t = r.template;
+  const n = computeNutrition(servingItems(t));
+  const favorite = isFavorite(t.id);
+  const time = formatTime(t.prepTime, t.cookTime);
+  const yieldN = templateYield(t);
+  const status = r.status === "ready"
+    ? `<span class="wcim-status ready">✅ Ready to cook</span>`
+    : `<span class="wcim-status near">🛒 Missing ${r.missingCount} ingredient${r.missingCount === 1 ? "" : "s"}</span>`;
+  const shortList = r.short.length ? `<ul class="wcim-short">${r.short.map(s => {
+    const notes = [];
+    notes.push(`need ${escapeHtml(formatServing(s.food, s.needGrams))}`);
+    if (s.haveGrams > 0) notes.push(`pantry has ${escapeHtml(formatServing(s.food, s.haveGrams))}`);
+    if (s.reservedGrams > 0) notes.push(`${escapeHtml(formatServing(s.food, s.reservedGrams))} already needed by other planned meals`);
+    // What to buy and what it costs are the same shopping-list change: the
+    // list's line for this food before -> after, priced in purchase
+    // quantities. (Rounding the shortfall alone could say "buy 1 oz" next to
+    // a price computed from a bigger or already-covered package.)
+    const was = shoppingPurchaseGrams(s.food, s.buyBeforeGrams), now = shoppingPurchaseGrams(s.food, s.buyAfterGrams);
+    const lbl = (g) => g > 0 ? formatShoppingQty(s.food, g) : "nothing";
+    const cost = s.cost > 0.005 ? `+${money(s.cost)}` : s.cost < -0.005 ? `−${money(-s.cost)}` : `no extra cost`;
+    const covered = Math.abs(now - was) < 1e-6
+      ? `<span class="wcim-short-note">Shopping list unchanged: the ${escapeHtml(lbl(s.buyAfterGrams))} you're already buying covers it.</span>`
+      : `<span class="wcim-short-note">Shopping list: ${escapeHtml(lbl(s.buyBeforeGrams))} → ${escapeHtml(lbl(s.buyAfterGrams))}</span>`;
+    return `<li>
+      <span class="wcim-short-main"><strong>${escapeHtml(s.name)}</strong> — short ${formatShort(s)}<span class="wcim-short-note">${notes.join(" · ")}</span>${covered}</span>
+      <span>${cost}</span>
+      <button type="button" class="wcim-have-btn" data-food="${escapeHtml(s.food)}" data-grams="${Math.ceil(s.shortGrams * 100) / 100}" title="Adds ${escapeHtml(formatServing(s.food, s.shortGrams))} to your pantry">✓ I have it</button>
+    </li>`;
+  }).join("")}</ul>` : "";
+  const d = r.extraCost;
+  const basket = Math.abs(d) < 0.005
+    ? `Adds nothing to your shopping basket.`
+    : d > 0 ? `Adds <strong>${money(d)}</strong> to your shopping basket (${money(r.basketBefore)} → ${money(r.basketAfter)}).`
+            : `Lowers your shopping basket by <strong>${money(-d)}</strong> (${money(r.basketBefore)} → ${money(r.basketAfter)}).`;
+  return `
+    <div class="meal-card wcim-card">
+      <div class="meal-head">
+        <span class="meal-icon">${slotIcon(t.slot)}</span>
+        <div class="meal-title">
+          <div class="meal-slot">${t.slot}${t.userRecipe ? ` · <span class="user-recipe-badge">✨ Yours</span>` : ""}</div>
+          <div class="meal-name">${escapeHtml(t.name)}</div>
+        </div>
+        <div class="meal-head-actions">${favorite ? "❤️" : ""}</div>
+      </div>
+      ${status}
+      <div class="meal-macros">
+        <span>${Math.round(n.cal)} kcal</span><span>P ${grams(n.protein)}</span><span>C ${grams(n.carbs)}</span><span>F ${grams(n.fat)}</span>
+        ${yieldN > 1 ? `<span>Makes ${yieldN} servings</span>` : ""}${time ? `<span>${time}</span>` : ""}
+        <span>per serving</span>
+      </div>
+      ${shortList}
+      <p class="wcim-extra">${basket}${r.short.length === 0 && d > 0.005 ? " (only package rounding — everything you need is in your pantry)" : ""}</p>
+      <div class="recipe-book-card-actions">
+        <button type="button" class="wcim-view-btn" data-template-id="${escapeHtml(t.id)}">📖 View Recipe</button>
+        <button type="button" class="wcim-add-btn" data-template-id="${escapeHtml(t.id)}">📌 Add to Plan</button>
+      </div>
+    </div>`;
+}
+
+function renderWhatCanIMake({ fresh } = {}) {
+  if (!wcim.ready) {
+    // First visit: cook for the household size from Settings.
+    $("#wcimServings").value = Math.min(PLACE_SERVINGS_MAX, Math.max(1, Number($("#servings").value) || 1));
+    wcim.ready = true;
+  }
+  document.querySelectorAll("#wcimSlot .bubble").forEach(b => {
+    b.classList.toggle("selected", b.dataset.value === wcim.slot);
+    updateBubbleAria(b);
+  });
+  wcimFillTargets({ fresh });
+  renderWcimPantry();
+
+  const s = readSettings();
+  const pantry = loadPantry();
+  const servings = wcimServings();
+  wcimResults = findCookableRecipes({
+    slot: wcim.slot, servings, plan: currentPlanResult ? currentPlanResult.plan : [], target: wcimTarget(),
+    pantry, diet: { vegetarian: s.vegetarianOnly, glutenFree: s.glutenFree, dairyFree: s.dairyFree },
+    dislikedIds: loadDislikedRecipes(),
+  });
+  const ready = wcimResults.filter(r => r.status === "ready");
+  const near = wcimResults.filter(r => r.status === "near");
+  // Nothing fits only because the plan already claims the pantry? Say so,
+  // and point at the fix (pick a slot to replace, which releases its share).
+  let heldByPlan = false;
+  if (!wcimResults.length && currentPlanResult && Object.keys(pantry).length) {
+    heldByPlan = findCookableRecipes({
+      slot: wcim.slot, servings, plan: [], target: null, pantry,
+      diet: { vegetarian: s.vegetarianOnly, glutenFree: s.glutenFree, dairyFree: s.dairyFree }, dislikedIds: loadDislikedRecipes(),
+    }).length > 0;
+  }
+  const diets = [s.vegetarianOnly && "vegetarian", s.glutenFree && "gluten-free", s.dairyFree && "dairy-free"].filter(Boolean);
+  const pantryCount = Object.keys(pantry).length;
+  $("#wcimSummary").textContent =
+    `${ready.length} ready to cook · ${near.length} missing 1–2 ingredients, for ${servings} serving${servings === 1 ? "" : "s"} of ${wcim.slot}` +
+    (diets.length ? ` · ${diets.join(" + ")} only` : "") +
+    (currentPlanResult ? "" : " · no plan yet, so results use your pantry only") +
+    (pantryCount === 0 ? " · your pantry is empty, so only very short recipes can match yet" : "");
+
+  const group = (key, title, list) => {
+    if (!list.length) return "";
+    const shown = list.slice(0, wcim.shown[key]);
+    return `<h3 class="wcim-group-title">${title} (${list.length})</h3>
+      <div class="recipe-book-grid">${shown.map(renderWcimCard).join("")}</div>
+      ${list.length > shown.length ? `<button type="button" class="secondary-btn wcim-more" data-group="${key}">Show ${Math.min(WCIM_PAGE_SIZE, list.length - shown.length)} more</button>` : ""}`;
+  };
+  $("#wcimResults").innerHTML = (ready.length || near.length)
+    ? group("ready", "✅ Ready to cook", ready) + group("near", "🛒 Missing 1–2 ingredients", near)
+    : `<p class="history-empty">${heldByPlan
+        ? (wcimTarget()
+          ? "Your other planned meals already need most of your pantry. Try another slot to replace, or fewer servings."
+          : "Your planned meals already need most of your pantry. Choose a meal in the plan to replace (its groceries are released), or try fewer servings.")
+        : "Nothing matches yet. Add what you have to your pantry, try fewer servings, or choose another meal."}</p>`;
+}
+
+function wcimSavePantry(pantry) {
+  savePantry(pantry);
+  syncPlanWithPantry();
+  renderWhatCanIMake();
+}
+
+function wireWhatCanIMake() {
+  $("#wcimSlot").addEventListener("click", (e) => {
+    const b = e.target.closest(".bubble");
+    if (!b) return;
+    wcim.slot = b.dataset.value;
+    wcim.targetKey = "";
+    wcim.shown = { ready: WCIM_PAGE_SIZE, near: WCIM_PAGE_SIZE };
+    renderWhatCanIMake({ fresh: true });
+  });
+  $("#wcimServings").addEventListener("input", () => { wcim.shown = { ready: WCIM_PAGE_SIZE, near: WCIM_PAGE_SIZE }; renderWhatCanIMake(); });
+  $("#wcimTarget").addEventListener("change", () => { wcim.targetKey = $("#wcimTarget").value; renderWhatCanIMake(); });
+  $("#wcimPantryFood").addEventListener("change", fillWcimUnits);
+  $("#wcimPantryAdd").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const food = $("#wcimPantryFood").value;
+    const amount = Number($("#wcimPantryAmount").value);
+    if (!food || !(amount > 0)) return;
+    const unitGrams = Number($("#wcimPantryUnit").selectedOptions[0].dataset.grams) || 1;
+    const pantry = loadPantry();
+    pantry[food] = Math.round(((pantry[food] || 0) + amount * unitGrams) * 100) / 100;
+    $("#wcimPantryAmount").value = "";
+    wcimSavePantry(pantry);
+  });
+  $("#wcimPantryItems").addEventListener("change", (e) => {
+    const input = e.target.closest(".wcim-pantry-input");
+    if (!input) return;
+    const pantry = loadPantry();
+    const g = Number(input.value);
+    if (!(g > 0)) delete pantry[input.dataset.food]; else pantry[input.dataset.food] = g;
+    wcimSavePantry(pantry);
+  });
+  $("#wcimPantryItems").addEventListener("click", (e) => {
+    const btn = e.target.closest(".wcim-pantry-remove");
+    if (!btn) return;
+    const pantry = loadPantry();
+    delete pantry[btn.dataset.food];
+    wcimSavePantry(pantry);
+  });
+  $("#wcimResults").addEventListener("click", (e) => {
+    const have = e.target.closest(".wcim-have-btn");
+    if (have) {
+      const pantry = loadPantry();
+      pantry[have.dataset.food] = Math.round(((pantry[have.dataset.food] || 0) + Number(have.dataset.grams)) * 100) / 100;
+      wcimSavePantry(pantry);
+      return;
+    }
+    const more = e.target.closest(".wcim-more");
+    if (more) { wcim.shown[more.dataset.group] += WCIM_PAGE_SIZE; renderWhatCanIMake(); return; }
+    const view = e.target.closest(".wcim-view-btn");
+    if (view) {
+      const t = MEAL_TEMPLATES.find(x => x.id === view.dataset.templateId);
+      if (t) openRecipeModal({ ...t, nutrition: computeNutrition(servingItems(t)), yieldServings: templateYield(t) });
+      return;
+    }
+    const add = e.target.closest(".wcim-add-btn");
+    if (add) openAddToPlanDialog(add.dataset.templateId, { servings: wcimServings(), target: wcimTarget() });
+  });
+}
+
+function showRecipeBookTab(name) {
+  document.querySelectorAll("#recipeBookTabs .bubble").forEach(b => {
+    b.classList.toggle("selected", b.dataset.value === name);
+    updateBubbleAria(b);
+  });
+  $("#recipeBookAllView").classList.toggle("hidden", name !== "all");
+  $("#myRecipesView").classList.toggle("hidden", name !== "mine");
+  $("#whatCanIMakeView").classList.toggle("hidden", name !== "cook");
+  if (name === "mine") renderMyRecipes();
+  else if (name === "cook") renderWhatCanIMake({ fresh: true });
+  else renderRecipeBook();
+}
+
+function formatMissingList(missing) {
+  return missing.join(", ");
+}
+
+function renderMyRecipeCard(r, byId) {
+  const isDraft = !!r.draft;
+  const link = r.source && r.source.url ? parseRecipeLink(r.source.url) : null;
+  const favorite = isFavorite(r.id);
+  const missing = isDraft ? recipeMissing(r) : [];
+  const yieldN = templateYield(r);
+  const parent = r.versionOf ? byId.get(r.versionOf) : null;
+  const variations = [...byId.values()].filter(x => x.versionOf === r.id).length;
+
+  const badges = [
+    isDraft ? `<span class="status-chip chip-draft">📝 Want to make · incomplete</span>`
+      : r.made ? `<span class="status-chip chip-made">✅ Made</span>`
+      : `<span class="status-chip chip-want">📝 Want to make</span>`,
+    isDraft && r.made ? `<span class="status-chip chip-made">✅ Made</span>` : "",
+    r.versionOf ? `<span class="status-chip chip-version">↳ Variation${parent ? ` of ${escapeHtml(parent.name)}` : " (original removed)"}</span>` : "",
+    variations ? `<span class="status-chip chip-version">${variations} variation${variations === 1 ? "" : "s"}</span>` : "",
+  ].join(" ");
+
+  const sources = [];
+  if (link) sources.push(`<a class="open-original-link" href="${escapeHtml(link.href)}" target="_blank" rel="noopener noreferrer">🔗 Open original · ${escapeHtml(recipeSourceLabel(link.platform))}</a>`);
+  if (r.source && r.source.text) sources.push(`<span class="source-chip">📋 Pasted text saved</span>`);
+  if (r.source && r.source.image && DATA_URL_IMAGE.test(r.source.image)) {
+    sources.push(`<span class="source-chip">🖼️ Screenshot saved</span><img class="my-recipe-thumb" src="${escapeHtml(r.source.image)}" alt="Saved screenshot of ${escapeHtml(r.name)}">`);
+  }
+
+  let macros = "";
+  if (!isDraft && r.items.length) {
+    const n = computeNutrition(servingItems(r));
+    macros = `<div class="meal-macros">
+        <span>${Math.round(n.cal)} kcal</span><span>P ${grams(n.protein)}</span><span>C ${grams(n.carbs)}</span><span>F ${grams(n.fat)}</span>
+        <span>${money(n.cost)} / serving</span>${yieldN > 1 ? `<span>Makes ${yieldN} servings</span>` : ""}
+      </div>`;
+  }
+
+  const id = escapeHtml(r.id);
+  return `
+    <div class="meal-card my-recipe-card" data-recipe-id="${id}">
+      <div class="meal-head">
+        <span class="meal-icon">${slotIcon(r.slot)}</span>
+        <div class="meal-title">
+          <div class="meal-slot">${escapeHtml(r.slot)}</div>
+          <div class="meal-name">${escapeHtml(r.name)}</div>
+        </div>
+        <div class="meal-head-actions">
+          <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this recipe"}" aria-pressed="${favorite}" title="Favorite">${favorite ? "❤️" : "🤍"}</button>
+        </div>
+      </div>
+      <div class="my-recipe-badges">${badges}</div>
+      ${isDraft ? `<p class="recipe-missing">Missing: ${escapeHtml(formatMissingList(missing))}</p>` : ""}
+      ${macros}
+      ${sources.length ? `<div class="my-recipe-sources">${sources.join(" ")}</div>` : ""}
+      ${isDraft ? "" : `<label class="my-recipe-autoplan"><input type="checkbox" class="my-recipe-autoplan-input" data-recipe-id="${id}" ${r.autoPlan !== false ? "checked" : ""}> 🔁 Include in automatic plans</label>`}
+      <div class="my-recipe-actions">
+        <button type="button" class="my-recipe-edit-btn recipe-book-view-btn" data-recipe-id="${id}">${isDraft ? "📝 Finish recipe" : "✏️ Edit"}</button>
+        <button type="button" class="my-recipe-made-btn recipe-book-view-btn" data-recipe-id="${id}" aria-pressed="${!!r.made}">${r.made ? "↩️ Not made yet" : "✅ Mark as made"}</button>
+        ${isDraft
+          ? `<button type="button" class="my-recipe-add-btn recipe-book-add-btn" disabled title="Add to Plan unlocks once the ingredients, quantities and servings are confirmed">📌 Add to Plan</button>`
+          : `<button type="button" class="my-recipe-add-btn recipe-book-add-btn" data-recipe-id="${id}">📌 Add to Plan</button>
+             <button type="button" class="my-recipe-tweaks-btn recipe-book-view-btn" data-recipe-id="${id}">💡 Suggest Tweaks</button>
+             <button type="button" class="my-recipe-view-btn recipe-book-view-btn" data-recipe-id="${id}">📖 View</button>`}
+      </div>
+    </div>`;
+}
+
+function renderMyRecipes() {
+  const all = loadCustomRecipes();
+  const byId = new Map(all.map(r => [r.id, r]));
+  const filter = myRecipesFilterValue();
+  const favorites = filter === "favorites" ? loadFavorites() : null;
+  const shown = all.filter(r => {
+    if (filter === "want") return !r.made;
+    if (filter === "made") return !!r.made;
+    if (filter === "favorites") return favorites.has(r.id);
+    return true;
+  }).reverse(); // newest saved first
+  $("#myRecipesCount").textContent = all.length
+    ? `${shown.length} of ${all.length} recipe${all.length === 1 ? "" : "s"}`
+    : "";
+  $("#myRecipesList").innerHTML = shown.length
+    ? shown.map(r => renderMyRecipeCard(r, byId)).join("")
+    : `<p class="history-empty">${all.length
+        ? "Nothing here with that filter."
+        : "Nothing saved yet. Tap ＋ Save a recipe to add a link, pasted text, a screenshot, or a recipe you type in."}</p>`;
+  updateMyRecipesTabCount();
+}
+
+function updatePersonalRecipe(id, change) {
+  const recipes = loadCustomRecipes();
+  const idx = recipes.findIndex(r => r.id === id);
+  if (idx < 0) return false;
+  const next = { ...recipes[idx], ...change };
+  Object.keys(next).forEach(k => { if (next[k] === undefined) delete next[k]; });
+  recipes[idx] = orderedRecipeRecord(next);
+  if (!saveCustomRecipes(recipes)) return false;
+  syncCustomRecipesIntoTemplates();
+  return true;
+}
+
+// ---------- Suggest Tweaks ----------
+
+let tweaksRecipeId = null;
+let tweaksResult = null;
+
+function tweaksDiet() {
+  const s = readSettings();
+  return { vegetarian: s.vegetarianOnly, glutenFree: s.glutenFree, dairyFree: s.dairyFree };
+}
+
+function openTweaksDialog(recipeId) {
+  const r = loadCustomRecipes().find(x => x.id === recipeId);
+  if (!r || r.draft) return;
+  tweaksRecipeId = recipeId;
+  const diet = tweaksDiet();
+  tweaksResult = suggestTweaks(r, { diet, pantry: loadPantry() });
+  $("#tweaksRecipeName").textContent = r.name;
+  const active = [diet.vegetarian && "vegetarian", diet.glutenFree && "gluten-free", diet.dairyFree && "dairy-free"].filter(Boolean);
+  $("#tweaksContext").textContent = (active.length
+    ? `Respecting your dietary filters: ${active.join(", ")}. `
+    : "No dietary filters are on in your settings. ")
+    + "Costs use BiteBudget's catalog prices (including any you've edited) and nutrition is per serving. Your original recipe is never changed.";
+  document.querySelectorAll("#tweaksKinds .bubble").forEach(b => b.classList.toggle("selected", b.dataset.value === "lowerCost"));
+  renderTweaks("lowerCost");
+  $("#tweaksDialog").showModal();
+}
+
+function tweakCompareRow(label, a, b, fmt, goodWhenLower) {
+  if (a === undefined || b === undefined) return "";
+  const delta = b - a;
+  const cls = Math.abs(delta) < 1e-9 ? "" : ((delta < 0) === goodWhenLower ? "tweak-better" : "tweak-worse");
+  return `<tr><th>${label}</th><td>${fmt(a)}</td><td class="${cls}">${fmt(b)}</td></tr>`;
+}
+
+function renderTweaks(kind) {
+  const group = tweaksResult && tweaksResult[kind];
+  if (!group) return;
+  const note = $("#tweaksNote");
+  note.textContent = group.note || "";
+  note.classList.toggle("hidden", !group.note);
+  $("#tweaksList").innerHTML = group.suggestions.map((s, i) => {
+    const rows = [
+      tweakCompareRow("Cost per serving", s.before.cost, s.after.cost, money, true),
+      kind === "usePantry" ? tweakCompareRow("Cost to buy per serving (after pantry)", s.before.buyCost, s.after.buyCost, money, true) : "",
+      tweakCompareRow("Calories", s.before.cal, s.after.cal, v => `${Math.round(v)} kcal`, true),
+      tweakCompareRow("Protein", s.before.protein, s.after.protein, grams, false),
+      tweakCompareRow("Carbs", s.before.carbs, s.after.carbs, grams, true),
+      tweakCompareRow("Fat", s.before.fat, s.after.fat, grams, true),
+      tweakCompareRow("Fiber", s.before.fiber, s.after.fiber, grams, false),
+    ].join("");
+    return `
+      <div class="tweak-card">
+        <ul class="tweak-changes">${s.changes.map(ch => `<li>${escapeHtml(describeChange(ch))}</li>`).join("")}</ul>
+        <table class="tweak-compare"><thead><tr><th></th><th>Before</th><th>After</th></tr></thead><tbody>${rows}</tbody></table>
+        <button type="button" class="primary-btn tweak-save-btn" data-kind="${escapeHtml(kind)}" data-index="${i}">Save as new version</button>
+      </div>`;
+  }).join("");
+}
+
+// Saves an accepted suggestion as a NEW personal recipe linked to the one it
+// came from. The original is never touched.
+function saveTweakAsVersion(kind, index) {
+  const group = tweaksResult && tweaksResult[kind];
+  const s = group && group.suggestions[index];
+  const orig = loadCustomRecipes().find(x => x.id === tweaksRecipeId);
+  if (!s || !orig) return false;
+  const summary = s.changes.map(describeChange).join("; ");
+  const slug = TWEAK_KINDS[kind].slug;
+  const version = orderedRecipeRecord({
+    id: newRecipeId(), slot: orig.slot, name: `${orig.name} (${slug})`,
+    yieldServings: templateYield(orig),
+    items: s.items.map(i => ({ food: i.food, grams: i.grams })),
+    instructions: [`Variation (${slug}): ${summary}.`, ...orig.instructions],
+    autoPlan: false, createdAt: Date.now(), versionOf: orig.id,
+    tweak: { kind, summary },
+    ...(orig.source && (orig.source.url || orig.source.text)
+      ? { source: { ...(orig.source.url ? { url: orig.source.url } : {}), ...(orig.source.text ? { text: orig.source.text } : {}) } } : {}),
+  });
+  const recipes = loadCustomRecipes();
+  recipes.push(version);
+  if (!saveCustomRecipes(recipes)) return false;
+  syncCustomRecipesIntoTemplates();
+  return version.id;
+}
+
+// ---------- Add to Plan ----------
+let addToPlanTemplateId = null;
+
+function mealPositionLabels(day) {
+  const snackCount = day.meals.filter(m => m.slot === "snack").length;
+  let snackN = 0;
+  return day.meals.map(m => {
+    const base = m.slot.charAt(0).toUpperCase() + m.slot.slice(1);
+    return m.slot === "snack" && snackCount > 1 ? `${base} ${++snackN}` : base;
+  });
+}
+
+function describeMealForReplace(m) {
+  if (m.unmatched) return "an empty slot";
+  if (m.custom) return `your logged meal "${m.name}"`;
+  return `"${m.name}"`;
+}
+
+function readAddToPlanServings() {
+  const s = Math.round(Number($("#addToPlanServings").value) || 1);
+  return Math.min(PLACE_SERVINGS_MAX, Math.max(1, s));
+}
+
+function fillAddToPlanSlots() {
+  const day = currentPlanResult.plan[Number($("#addToPlanDay").value)];
+  const t = MEAL_TEMPLATES.find(x => x.id === addToPlanTemplateId);
+  const labels = mealPositionLabels(day);
+  $("#addToPlanSlot").innerHTML = day.meals
+    .map((m, i) => `<option value="${i}">${escapeHtml(labels[i])}</option>`).join("");
+  const match = t ? day.meals.findIndex(m => m.slot === t.slot) : -1;
+  $("#addToPlanSlot").value = String(match >= 0 ? match : 0);
+  updateAddToPlanPreview();
+}
+
+function updateAddToPlanPreview() {
+  const t = MEAL_TEMPLATES.find(x => x.id === addToPlanTemplateId);
+  if (!t || !currentPlanResult) return;
+  const portions = readAddToPlanServings();
+  const y = templateYield(t);
+  const factor = portions / y;
+  const n = computeNutrition(t.items.map(({ food, grams: g }) => ({ food, grams: g * factor })));
+  const pct = Math.round(factor * 100);
+  $("#addToPlanPreview").textContent =
+    `${portions} of ${y} serving${y === 1 ? "" : "s"} = ${pct}% of the recipe · ${Math.round(n.cal / portions)} kcal per serving · about ${money(n.cost)} of ingredients`;
+  const day = currentPlanResult.plan[Number($("#addToPlanDay").value)];
+  const m = day && day.meals[Number($("#addToPlanSlot").value)];
+  $("#addToPlanReplaces").textContent = m ? `Replaces ${describeMealForReplace(m)}.` : "";
+}
+
+function openAddToPlanDialog(templateId, preset) {
+  const t = MEAL_TEMPLATES.find(x => x.id === templateId);
+  if (!t) return;
+  addToPlanTemplateId = templateId;
+  $("#addToPlanRecipeName").textContent = t.name;
+  const hasPlan = !!currentPlanResult;
+  $("#addToPlanEmpty").classList.toggle("hidden", hasPlan);
+  $("#addToPlanForm").classList.toggle("hidden", !hasPlan);
+  if (hasPlan) {
+    $("#addToPlanDay").innerHTML = currentPlanResult.plan
+      .map((d, i) => `<option value="${i}">Day ${d.day}</option>`).join("");
+    $("#addToPlanDay").value = String(Math.max(0, Math.min(currentPlanResult.plan.length - 1, activeDayNum - 1)));
+    $("#addToPlanServings").value = Math.min(PLACE_SERVINGS_MAX, templateYield(t));
+    fillAddToPlanSlots();
+    // What can I make? hands over the slot and servings it evaluated, so
+    // the recipe lands exactly where its numbers were calculated.
+    if (preset) {
+      if (preset.servings) $("#addToPlanServings").value = Math.min(PLACE_SERVINGS_MAX, Math.max(1, preset.servings));
+      if (preset.target && currentPlanResult.plan[preset.target.dayIndex]) {
+        $("#addToPlanDay").value = String(preset.target.dayIndex);
+        fillAddToPlanSlots();
+        $("#addToPlanSlot").value = String(preset.target.mealIndex);
+        if (preset.servings) $("#addToPlanServings").value = Math.min(PLACE_SERVINGS_MAX, Math.max(1, preset.servings));
+      }
+      updateAddToPlanPreview();
+    }
+  }
+  $("#addToPlanDialog").showModal();
+}
+
 function slotIcon(slot) {
   return { breakfast: "🌅", lunch: "🥗", dinner: "🍽️", snack: "🍎" }[slot] || "🍴";
 }
 
 function renderMealCard(meal, dayIndex, mealIndex) {
+  if (meal.unmatched) {
+    return `
+      <div class="meal-card unmatched-meal-card">
+        <div class="meal-head">
+          <span class="meal-icon">⚠️</span>
+          <div>
+            <div class="meal-slot">${meal.slot}</div>
+            <div class="meal-name">No matching recipe</div>
+          </div>
+        </div>
+        <p class="unmatched-meal-note">${escapeHtml(meal.unmatchedReason || "No recipe in the library satisfies your current dietary restrictions for this meal.")}</p>
+        <div class="meal-head-actions">
+          <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Try again" title="Try again — useful after adding a recipe or relaxing a restriction">🔁 Try again</button>
+          <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Log your own meal instead" title="Log your own meal instead">📝 Log your own</button>
+        </div>
+      </div>`;
+  }
+
   if (meal.custom && meal.pending) {
     return `
       <div class="meal-card pending-meal-card">
@@ -893,7 +1936,7 @@ function renderMealCard(meal, dayIndex, mealIndex) {
           <span class="meal-icon">${slotIcon(meal.slot)}</span>
           <div>
             <div class="meal-slot">${meal.slot}</div>
-            <div class="meal-name">${meal.name}</div>
+            <div class="meal-name">${escapeHtml(meal.name)}</div>
           </div>
         </div>
         <p class="pending-meal-note">Left open — add what you had once you know.</p>
@@ -909,8 +1952,8 @@ function renderMealCard(meal, dayIndex, mealIndex) {
         <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Edit this meal" title="Edit this meal">✏️</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Replace with an auto-picked meal" title="Replace with an auto-picked meal">↩️</button>`
     : `
-        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${meal.id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
-        <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${meal.id}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
+        <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${escapeHtml(meal.id)}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
+        <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${escapeHtml(meal.id)}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
         <button type="button" class="meal-swap-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Swap this meal" title="Swap this meal">🔀</button>
         <button type="button" class="custom-meal-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}" aria-label="Log your own meal instead" title="Log your own meal instead">📝</button>`;
 
@@ -920,7 +1963,7 @@ function renderMealCard(meal, dayIndex, mealIndex) {
         <span class="meal-icon">${slotIcon(meal.slot)}</span>
         <div class="meal-title">
           <div class="meal-slot">${meal.slot}</div>
-          <div class="meal-name">${meal.name}</div>
+          <div class="meal-name">${escapeHtml(meal.name)}</div>
         </div>
         <div class="meal-head-actions">
           ${actionButtons}
@@ -932,6 +1975,7 @@ function renderMealCard(meal, dayIndex, mealIndex) {
         <span>P ${grams(n.protein)}</span>
         <span>C ${grams(n.carbs)}</span>
         <span>F ${grams(n.fat)}</span>
+        ${meal.placed ? `<span class="user-recipe-badge" title="You're cooking ${meal.servings} serving${meal.servings === 1 ? "" : "s"}. Calories and macros here are for ONE serving (what one person eats); the cost is for everything you're cooking.">📌 ${meal.servings} serving${meal.servings === 1 ? "" : "s"} placed · kcal &amp; macros per serving · cost for all</span>` : ""}
       </div>
       ${meal.custom ? "" : `<button type="button" class="recipe-btn" data-day-index="${dayIndex}" data-meal-index="${mealIndex}">📖 View Recipe</button>`}
     </div>`;
@@ -944,7 +1988,10 @@ function renderMealCard(meal, dayIndex, mealIndex) {
 // or ruling out a recipe here does the exact same thing it would from a
 // generated plan), and a "View Recipe" that opens the same cookbook page.
 function renderRecipeBookCard(t) {
-  const n = computeNutrition(t.items);
+  // Per serving, so a 4-serving chili reads as one portion — the same
+  // numbers the planner works from. "Makes N" says how big the batch is.
+  const n = computeNutrition(servingItems(t));
+  const yieldN = templateYield(t);
   const favorite = isFavorite(t.id);
   const disliked = isDislikedRecipe(t.id);
   const time = formatTime(t.prepTime, t.cookTime);
@@ -953,13 +2000,13 @@ function renderRecipeBookCard(t) {
       <div class="meal-head">
         <span class="meal-icon">${slotIcon(t.slot)}</span>
         <div class="meal-title">
-          <div class="meal-slot">${t.slot}${t.userRecipe ? ` · <span class="user-recipe-badge">✨ Yours</span>` : ""}</div>
-          <div class="meal-name">${t.name}</div>
+          <div class="meal-slot">${t.slot}${t.userRecipe ? ` · <span class="user-recipe-badge">✨ Yours</span>${t.autoPlan === false ? ` · <span title="The planner won't pick this on its own; Add to Plan still works">not auto-planned</span>` : ""}` : ""}</div>
+          <div class="meal-name">${escapeHtml(t.name)}</div>
         </div>
         <div class="meal-head-actions">
-          ${t.userRecipe ? `<button type="button" class="recipe-edit-btn" data-template-id="${t.id}" aria-label="Edit this recipe" title="Edit this recipe">✏️</button>` : ""}
-          <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${t.id}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
-          <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${t.id}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
+          ${t.userRecipe ? `<button type="button" class="recipe-edit-btn" data-template-id="${escapeHtml(t.id)}" aria-label="Edit this recipe" title="Edit this recipe">✏️</button>` : ""}
+          <button type="button" class="favorite-btn ${favorite ? "active" : ""}" data-template-id="${escapeHtml(t.id)}" aria-label="${favorite ? "Remove from favorites" : "Favorite this meal"}" aria-pressed="${favorite}" title="Favorite this meal">${favorite ? "❤️" : "🤍"}</button>
+          <button type="button" class="dislike-btn ${disliked ? "active" : ""}" data-template-id="${escapeHtml(t.id)}" aria-label="${disliked ? "Remove \"not for me\"" : "Not for me — don't suggest this again"}" aria-pressed="${disliked}" title="Not for me — don't suggest this again">👎</button>
           <div class="meal-cost">${money(n.cost)}</div>
         </div>
       </div>
@@ -968,9 +2015,13 @@ function renderRecipeBookCard(t) {
         <span>P ${grams(n.protein)}</span>
         <span>C ${grams(n.carbs)}</span>
         <span>F ${grams(n.fat)}</span>
+        ${yieldN > 1 ? `<span>Makes ${yieldN} servings</span>` : ""}
         ${time ? `<span>${time}</span>` : ""}
       </div>
-      <button type="button" class="recipe-book-view-btn" data-template-id="${t.id}">📖 View Recipe</button>
+      <div class="recipe-book-card-actions">
+        <button type="button" class="recipe-book-view-btn" data-template-id="${escapeHtml(t.id)}">📖 View Recipe</button>
+        <button type="button" class="recipe-book-add-btn" data-template-id="${escapeHtml(t.id)}">📌 Add to Plan</button>
+      </div>
     </div>`;
 }
 
@@ -980,10 +2031,14 @@ function renderRecipeBook() {
   const protein = document.querySelector("#recipeProteinFilter .bubble.selected")?.dataset.value || "all";
   const diet = { vegetarian: $("#recipeVegOnly").checked, glutenFree: $("#recipeGlutenFree").checked, dairyFree: $("#recipeDairyFree").checked };
 
+  const favoritesOnly = $("#recipeFavoritesOnly").checked;
+  const favoriteIds = favoritesOnly ? loadFavorites() : null;
+
   const matches = MEAL_TEMPLATES.filter(t => {
     if (slot !== "all" && t.slot !== slot) return false;
     if (protein !== "all" && !templateProteinFamilies(t).includes(protein)) return false;
     if (!matchesDiet(t.items, diet)) return false;
+    if (favoritesOnly && !favoriteIds.has(t.id)) return false;
     if (search && !t.name.toLowerCase().includes(search)) return false;
     return true;
   });
@@ -996,11 +2051,30 @@ function renderRecipeBook() {
 
 function loadCustomRecipes() {
   const saved = localStorage.getItem(CUSTOM_RECIPES_KEY);
-  return saved ? JSON.parse(saved) : [];
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
+// Returns false when the browser refuses the write (storage full — a saved
+// screenshot is the likely cause) so the caller can say so instead of
+// silently losing the recipe.
 function saveCustomRecipes(recipes) {
-  localStorage.setItem(CUSTOM_RECIPES_KEY, JSON.stringify(recipes));
+  try {
+    localStorage.setItem(CUSTOM_RECIPES_KEY, JSON.stringify(recipes));
+    return true;
+  } catch (err) {
+    console.error("BiteBudget: couldn't save recipes.", err);
+    return false;
+  }
+}
+
+function newRecipeId() {
+  return `custom-recipe-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 // A user recipe is a real MEAL_TEMPLATES entry (tagged userRecipe: true) so
@@ -1012,7 +2086,12 @@ function syncCustomRecipesIntoTemplates() {
   for (let i = MEAL_TEMPLATES.length - 1; i >= 0; i--) {
     if (MEAL_TEMPLATES[i].userRecipe) MEAL_TEMPLATES.splice(i, 1);
   }
-  loadCustomRecipes().forEach(r => MEAL_TEMPLATES.push({ ...r, userRecipe: true }));
+  // "Want to make" drafts stay out of MEAL_TEMPLATES entirely: they may have no
+  // ingredients or servings, so nothing that plans, prices or lists meals can
+  // ever see them. Only complete recipes join the pool; whether the automatic
+  // planner may PICK one is its Include-in-automatic-plans setting (isPlannable).
+  loadCustomRecipes().filter(r => !r.draft).forEach(r => MEAL_TEMPLATES.push({ ...r, userRecipe: true }));
+  updateMyRecipesTabCount();
 }
 
 // Grouped-by-category <option> list for an ingredient row's food picker —
@@ -1030,55 +2109,183 @@ function foodOptionsHTML(selectedFood) {
   }).join("");
 }
 
+function kitchenUnitSelectHTML(food, selectedKey) {
+  return kitchenUnitOptions(food)
+    .map(o => `<option value="${escapeHtml(o.key)}" ${o.key === selectedKey ? "selected" : ""}>${escapeHtml(o.label)}</option>`).join("");
+}
+function roundQty(x) { return Math.round(x * 100) / 100; }
+
+// The row's exact gram amount lives in data-grams, so flipping the unit
+// back and forth never drifts through display rounding.
 function customRecipeIngredientRowHTML(food, grams) {
   const defaultFood = food || Object.keys(FOODS)[0];
+  const g = grams != null ? grams : 100;
+  const shown = g > 0 ? g : "";
   return `
-    <div class="custom-recipe-ingredient-row">
+    <div class="custom-recipe-ingredient-row" data-grams="${g}">
       <select class="custom-recipe-food-select" aria-label="Ingredient">${foodOptionsHTML(defaultFood)}</select>
-      <input type="number" class="custom-recipe-grams-input" min="0" step="5" value="${grams != null ? grams : 100}" aria-label="Grams">
-      <span class="unit-label">g</span>
+      <input type="number" class="custom-recipe-grams-input" min="0" step="any" value="${shown}" aria-label="Amount">
+      <select class="custom-recipe-unit-select" aria-label="Unit">${kitchenUnitSelectHTML(defaultFood, "g")}</select>
       <button type="button" class="custom-recipe-remove-ingredient" aria-label="Remove ingredient">✕</button>
     </div>`;
+}
+
+function rowUnitGrams(row) {
+  const food = row.querySelector(".custom-recipe-food-select").value;
+  const key = row.querySelector(".custom-recipe-unit-select").value;
+  return (kitchenUnitOptions(food).find(o => o.key === key) || { grams: 1 }).grams;
+}
+// Typing an amount: recompute the row's grams from amount x unit.
+function syncRowGramsFromQty(row) {
+  const qty = Math.max(0, Number(row.querySelector(".custom-recipe-grams-input").value) || 0);
+  row.dataset.grams = String(qty * rowUnitGrams(row));
+}
+// Changing the unit: same physical amount, shown in the new unit.
+function showRowGramsInUnit(row) {
+  row.querySelector(".custom-recipe-grams-input").value = roundQty(Number(row.dataset.grams) / rowUnitGrams(row));
+}
+// Changing the ingredient: unit choices belong to the food, so reset to
+// grams (the amount itself is kept).
+function resetRowUnits(row) {
+  const food = row.querySelector(".custom-recipe-food-select").value;
+  row.querySelector(".custom-recipe-unit-select").innerHTML = kitchenUnitSelectHTML(food, "g");
+  showRowGramsInUnit(row);
 }
 
 function readCustomRecipeIngredients() {
   return [...document.querySelectorAll("#customRecipeIngredients .custom-recipe-ingredient-row")]
     .map(row => ({
       food: row.querySelector(".custom-recipe-food-select").value,
-      grams: Math.max(0, Number(row.querySelector(".custom-recipe-grams-input").value) || 0),
+      grams: Math.max(0, Number(row.dataset.grams) || 0),
     }))
     .filter(({ grams }) => grams > 0);
+}
+
+// null when the field is blank — "servings not set yet" is a real state for a
+// Want-to-make draft, and must never silently become 1.
+function readCustomRecipeYield() {
+  const raw = $("#customRecipeYield").value.trim();
+  if (raw === "") return null;
+  return Math.min(RECIPE_YIELD_MAX, Math.max(1, Math.round(Number(raw) || 1)));
 }
 
 function updateCustomRecipeNutritionPreview() {
   const items = readCustomRecipeIngredients();
   const n = items.length ? computeNutrition(items) : { cal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 };
-  $("#customRecipeNutritionPreview").textContent =
-    `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)} · ${money(n.cost)}`;
-  if (items.length) $("#customRecipeError").classList.add("hidden");
+  const y = readCustomRecipeYield();
+  const line = (v, d) => `${Math.round(v.cal / d)} kcal · P ${grams(v.protein / d)} · C ${grams(v.carbs / d)} · F ${grams(v.fat / d)}`;
+  $("#customRecipeNutritionPreview").textContent = y === null
+    ? `Whole batch: ${line(n, 1)} · ${money(n.cost)} — enter how many servings it makes for per-serving numbers`
+    : y > 1
+      ? `Per serving: ${line(n, y)} · ${money(n.cost / y)} — whole batch ${money(n.cost)}`
+      : `${line(n, 1)} · ${money(n.cost)}`;
 }
 
 let customRecipeEditingId = null;
+// What the editor holds besides its visible inputs: the saved screenshot,
+// the pasted-text lines that couldn't be matched, and the fields it must carry
+// through untouched (made-date, creation time, which recipe this varies).
+let customRecipeExtra = { image: null, unmatched: [], keep: {} };
 
-// `existing` is a saved custom recipe to edit, or null/undefined to create
-// a new one from a blank single-ingredient-row form.
+function setCustomRecipeImage(dataUrl) {
+  customRecipeExtra.image = dataUrl || null;
+  const box = $("#customRecipeImagePreview");
+  box.classList.toggle("hidden", !dataUrl);
+  if (dataUrl && DATA_URL_IMAGE.test(dataUrl)) box.querySelector("img").src = dataUrl;
+  else box.querySelector("img").removeAttribute("src");
+}
+
+function renderCustomRecipeUnmatched() {
+  const lines = customRecipeExtra.unmatched;
+  $("#customRecipeUnmatched").classList.toggle("hidden", !lines.length);
+  $("#customRecipeUnmatchedList").innerHTML = lines.map(l => `<li>${escapeHtml(l)}</li>`).join("");
+}
+
+// Shows/hides "Open original" for whatever link is currently typed.
+function refreshCustomRecipeLink() {
+  const raw = $("#customRecipeSourceUrl").value;
+  const link = raw.trim() ? parseRecipeLink(raw) : null;
+  const a = $("#customRecipeOpenOriginal");
+  a.classList.toggle("hidden", !link);
+  if (link) a.setAttribute("href", link.href); else a.removeAttribute("href");
+  const note = $("#customRecipeLinkNote");
+  if (raw.trim() && !link) {
+    note.textContent = "That doesn't look like a web link (it should start with http:// or https://).";
+    note.classList.remove("hidden");
+  } else if (link) {
+    note.textContent = `${recipeSourceLabel(link.platform)} link saved as-is — BiteBudget can't read the page, so add the ingredients and amounts yourself.`;
+    note.classList.remove("hidden");
+  } else {
+    note.classList.add("hidden");
+  }
+}
+
+// `existing` is a saved personal recipe to edit (complete or a draft), or
+// null for a new one.
 function openCustomRecipeDialog(existing) {
   customRecipeEditingId = existing ? existing.id : null;
-  $("#customRecipeTitle").textContent = existing ? "✏️ Edit Your Recipe" : "✨ Add Your Recipe";
+  const isDraft = !!(existing && existing.draft);
+  $("#customRecipeTitle").textContent = existing ? (isDraft ? "📝 Finish Your Recipe" : "✏️ Edit Your Recipe") : "✨ Save a Recipe";
   $("#customRecipeDeleteBtn").classList.toggle("hidden", !existing);
   $("#customRecipeError").classList.add("hidden");
+  $("#customRecipeParseNote").classList.add("hidden");
   $("#customRecipeName").value = existing ? existing.name : "";
   $("#customRecipeInstructions").value = existing ? existing.instructions.join("\n") : "";
+  // A saved complete recipe with no stored yield is a legacy one-serving recipe.
+  $("#customRecipeYield").value = existing
+    ? (Number.isInteger(existing.yieldServings) ? existing.yieldServings : (isDraft ? "" : 1))
+    : "";
+  const src = (existing && existing.source) || {};
+  $("#customRecipeSourceUrl").value = src.url || "";
+  $("#customRecipeSourceText").value = src.text || "";
+  $("#customRecipeSourceImage").value = "";
+  setCustomRecipeImage(src.image || null);
+  refreshCustomRecipeLink();
+  customRecipeExtra.unmatched = existing && Array.isArray(existing.unmatched) ? [...existing.unmatched] : [];
+  renderCustomRecipeUnmatched();
+  customRecipeExtra.keep = {};
+  if (existing) for (const k of ["madeAt", "createdAt", "versionOf", "tweak"]) if (existing[k] !== undefined) customRecipeExtra.keep[k] = existing[k];
+  $("#customRecipeMade").checked = !!(existing && existing.made);
+  // Recipes saved before this setting existed were always auto-planned, so
+  // they open as "on"; everything new starts off.
+  $("#customRecipeAutoPlan").checked = existing ? existing.autoPlan !== false && !isDraft : false;
 
   const slot = existing ? existing.slot : "breakfast";
   document.querySelectorAll("#customRecipeSlot .bubble").forEach(b => b.classList.toggle("selected", b.dataset.value === slot));
   document.querySelectorAll("#customRecipeSlot .bubble").forEach(updateBubbleAria);
 
-  const rows = existing && existing.items.length ? existing.items : [{ food: null, grams: 100 }];
+  const rows = existing && existing.items.length ? existing.items : [{ food: null, grams: 0 }];
   $("#customRecipeIngredients").innerHTML = rows.map(i => customRecipeIngredientRowHTML(i.food, i.grams)).join("");
   updateCustomRecipeNutritionPreview();
 
   $("#customRecipeDialog").showModal();
+}
+
+// Shrinks a screenshot before it's stored (localStorage is small): longest
+// side 1280px, re-encoded as JPEG. Rejects if the file isn't a readable image.
+function compressImageFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error("not an image"));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("couldn't read the file"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("couldn't decode the image"));
+      img.onload = () => {
+        const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // Builds an FDA-style "Nutrition Facts" box. %DV uses the standard FDA
@@ -1109,7 +2316,13 @@ function renderNutritionLabel(n) {
 
 function loadMyMeals() {
   const saved = localStorage.getItem(MY_MEALS_KEY);
-  return saved ? JSON.parse(saved) : [];
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function saveMyMeals(meals) {
@@ -1144,8 +2357,8 @@ function renderMyMealsList() {
     <div class="my-meals-label">Your saved meals</div>
     ${meals.map(m => `
       <div class="my-meal-row">
-        <button type="button" class="my-meal-pick" data-name="${m.name}">${m.name} — ${Math.round(m.protein * 4 + m.carbs * 4 + m.fat * 9)} kcal</button>
-        <button type="button" class="my-meal-remove" data-name="${m.name}" aria-label="Remove saved meal" title="Remove saved meal">✕</button>
+        <button type="button" class="my-meal-pick" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)} — ${Math.round(m.protein * 4 + m.carbs * 4 + m.fat * 9)} kcal</button>
+        <button type="button" class="my-meal-remove" data-name="${escapeHtml(m.name)}" aria-label="Remove saved meal" title="Remove saved meal">✕</button>
       </div>`).join("")}`;
 }
 
@@ -1233,7 +2446,7 @@ function openRecipeModal(meal) {
   $("#recipeSlot").textContent = meal.slot;
   $("#recipeTitle").textContent = meal.name;
   const time = formatTime(meal.prepTime, meal.cookTime);
-  $("#recipeMacros").textContent = `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)}${time ? " · " + time : ""}`;
+  $("#recipeMacros").textContent = `${Math.round(n.cal)} kcal · P ${grams(n.protein)} · C ${grams(n.carbs)} · F ${grams(n.fat)}${time ? " · " + time : ""}${meal.yieldServings > 1 ? ` · per serving (recipe makes ${meal.yieldServings})` : ""}`;
   const favorite = isFavorite(meal.id);
   $("#recipeFavoriteBtn").textContent = favorite ? "❤️ Favorited" : "🤍 Favorite this recipe";
   $("#recipeFavoriteBtn").classList.toggle("active", favorite);
@@ -1241,8 +2454,11 @@ function openRecipeModal(meal) {
   $("#recipeDislikeBtn").textContent = disliked ? "👎 Not for me" : "👎 Not for me?";
   $("#recipeDislikeBtn").classList.toggle("active", disliked);
   $("#nutritionLabel").innerHTML = renderNutritionLabel(n);
-  $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("");
-  $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${s}</li>`).join("");
+  // meal.name/instructions can be user-authored (own recipe, or loaded
+  // from an imported backup file) — escape before inserting as HTML so
+  // saved text can never be interpreted as markup or run as script.
+  $("#recipeIngredients").innerHTML = meal.items.map(i => `<li>${escapeHtml(FOODS[i.food].name)} — ${escapeHtml(formatServing(i.food, i.grams))}</li>`).join("");
+  $("#recipeInstructions").innerHTML = meal.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("");
   $("#recipeModal").showModal();
 }
 
@@ -1285,6 +2501,32 @@ function loadCheckedShoppingItems() {
 
 function saveCheckedShoppingItems(checked) {
   localStorage.setItem(SHOPPING_CHECKED_KEY, JSON.stringify([...checked]));
+}
+
+// Every edit that can change what needs buying (swap, prep-batch shuffle,
+// logged meal, Add to Plan) goes through here so the shopping checkmarks
+// stay honest: a food you'd already ticked off that now needs MORE than you
+// bought is unticked again. Ticks survive when the quantity you'd buy is the
+// same or smaller, and when a plan change doesn't touch that food at all.
+function uncheckIncreasedShoppingItems(before, after) {
+  const checked = loadCheckedShoppingItems();
+  let changed = false;
+  after.forEach(item => {
+    if (!checked.has(item.food)) return;
+    const was = before.get(item.food) || 0;
+    const now = shoppingPurchaseGrams(item.food, item.grams);
+    if (now > was + 1e-6) { checked.delete(item.food); changed = true; }
+  });
+  if (changed) saveCheckedShoppingItems(checked);
+}
+
+function commitPlanMutation(mutate) {
+  const before = new Map(currentPlanResult.shoppingList.map(i => [i.food, shoppingPurchaseGrams(i.food, i.grams)]));
+  mutate();
+  uncheckIncreasedShoppingItems(before, currentPlanResult.shoppingList);
+  updateLatestHistoryEntry(currentPlanResult.summary);
+  localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
+  renderPlan(currentPlanResult);
 }
 
 function renderShoppingList(shoppingList, totalCost, totalBudget) {
@@ -1362,14 +2604,24 @@ function renderPantryDialog() {
   const pending = pendingPantrySuggestions();
 
   const suggestedEntries = Object.entries(pending);
+  // Projections only. Nothing here is saved, and nothing here touches the
+  // shopping list, until the user confirms how much they actually have.
   $("#pantrySuggested").innerHTML = suggestedEntries.length ? `
     <p class="pantry-section-label">Might be left over from this week's shopping</p>
+    <p class="wizard-hint">Estimates only — they don't exist until you've shopped. Enter what's actually in your kitchen now and confirm; until then they stay off your pantry and your shopping list.</p>
     <div class="pantry-suggested-list">
-      ${suggestedEntries.map(([food, grams]) => `
-        <div class="pantry-suggested-row">
-          <span>${FOODS[food].name} — ${formatServing(food, grams)}</span>
-          <button type="button" class="pantry-add-btn" data-food="${food}" data-grams="${grams}">+ Add</button>
-        </div>`).join("")}
+      ${suggestedEntries.map(([food, grams]) => {
+        const units = kitchenUnitOptions(food);
+        const su = SERVING_UNITS[food];
+        const def = (su && units.find(u => u.key === su.unit)) || units[0];
+        return `
+        <div class="pantry-suggested-row" data-food="${escapeHtml(food)}" data-grams="${grams}" data-unit-grams="${def.grams}" data-exact-grams="${grams}">
+          <span>${escapeHtml(FOODS[food].name)} — about ${escapeHtml(formatServing(food, grams))} projected</span>
+          <input type="number" class="pantry-confirm-amount" min="0" step="any" value="${Math.round(grams / def.grams * 100) / 100}" aria-label="How much ${escapeHtml(FOODS[food].name)} you actually have">
+          <select class="pantry-confirm-unit" aria-label="Unit">${units.map(u => `<option value="${u.key}" data-grams="${u.grams}"${u.key === def.key ? " selected" : ""}>${escapeHtml(u.label)}</option>`).join("")}</select>
+          <button type="button" class="pantry-confirm-btn" data-food="${escapeHtml(food)}">Confirm on hand</button>
+        </div>`;
+      }).join("")}
     </div>` : "";
 
   const pantryEntries = Object.entries(pantry);
@@ -1402,17 +2654,24 @@ function renderPrintBooklet(result) {
     <div class="booklet-day">
       <h2>Day ${day.day}</h2>
       ${day.meals.map(m => {
+        if (m.unmatched) {
+          return `
+            <div class="booklet-meal">
+              <h3>${slotIcon(m.slot)} ${m.slot} — No matching recipe</h3>
+              <p class="booklet-meal-macros">${escapeHtml(m.unmatchedReason || "No recipe satisfied your dietary restrictions for this meal.")}</p>
+            </div>`;
+        }
         if (m.custom && m.pending) {
           return `
             <div class="booklet-meal">
-              <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
+              <h3>${slotIcon(m.slot)} ${m.slot} — ${escapeHtml(m.name)}</h3>
               <p class="booklet-meal-macros">Left open — not yet logged.</p>
             </div>`;
         }
         if (m.custom) {
           return `
             <div class="booklet-meal">
-              <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
+              <h3>${slotIcon(m.slot)} ${m.slot} — ${escapeHtml(m.name)}</h3>
               <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}</p>
               <p class="booklet-meal-macros">Logged by you.</p>
             </div>`;
@@ -1420,16 +2679,16 @@ function renderPrintBooklet(result) {
         const time = formatTime(m.prepTime, m.cookTime);
         return `
         <div class="booklet-meal">
-          <h3>${slotIcon(m.slot)} ${m.slot} — ${m.name}</h3>
+          <h3>${slotIcon(m.slot)} ${m.slot} — ${escapeHtml(m.name)}</h3>
           <p class="booklet-meal-macros">${Math.round(m.nutrition.cal)} kcal · P ${grams(m.nutrition.protein)} · C ${grams(m.nutrition.carbs)} · F ${grams(m.nutrition.fat)} · ${money(m.nutrition.cost)}${time ? " · " + time : ""}</p>
           <div class="booklet-meal-body">
             <div>
               <strong>Ingredients</strong>
-              <ul>${m.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
+              <ul>${m.items.map(i => `<li>${escapeHtml(FOODS[i.food].name)} — ${escapeHtml(formatServing(i.food, i.grams))}</li>`).join("")}</ul>
             </div>
             <div>
               <strong>Instructions</strong>
-              <ol>${m.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
+              <ol>${m.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
             </div>
           </div>
         </div>`;
@@ -1458,15 +2717,15 @@ function renderPrepBatches(batches) {
       <div class="prep-batch-head">
         <div>
           <div class="prep-batch-slot">${slotIcon(b.slot)} ${b.slot}</div>
-          <div class="prep-batch-name">${b.name}</div>
+          <div class="prep-batch-name">${escapeHtml(b.name)}</div>
         </div>
-        <button type="button" class="prep-batch-shuffle-btn" data-batch-id="${b.id}" aria-label="Prep a different recipe instead" title="Prep a different recipe instead">🔀</button>
+        <button type="button" class="prep-batch-shuffle-btn" data-batch-id="${escapeHtml(b.id)}" aria-label="Prep a different recipe instead" title="Prep a different recipe instead">🔀</button>
       </div>
       <div class="prep-batch-servings">🧺 ${prepBatchServingsLabel(b)} · ${money(b.cost)}</div>
-      <ul class="prep-batch-items">${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
+      <ul class="prep-batch-items">${b.items.map(i => `<li>${escapeHtml(FOODS[i.food].name)} — ${escapeHtml(formatServing(i.food, i.grams))}</li>`).join("")}</ul>
       <details class="prep-batch-instructions">
         <summary>📋 How to make this batch</summary>
-        <ol>${b.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
+        <ol>${b.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
       </details>
       <p class="prep-batch-note">${PREP_STORAGE_NOTE}</p>
     </div>`).join("");
@@ -1484,16 +2743,16 @@ function renderPrintPrepGuide(result) {
     </div>`;
   const cards = sorted.map(b => `
     <div class="booklet-meal">
-      <h3>${slotIcon(b.slot)} ${b.slot} — ${b.name}</h3>
+      <h3>${slotIcon(b.slot)} ${b.slot} — ${escapeHtml(b.name)}</h3>
       <p class="booklet-meal-macros">${prepBatchServingsLabel(b)} · ${money(b.cost)} total</p>
       <div class="booklet-meal-body">
         <div>
           <strong>Total ingredients</strong>
-          <ul>${b.items.map(i => `<li>${FOODS[i.food].name} — ${formatServing(i.food, i.grams)}</li>`).join("")}</ul>
+          <ul>${b.items.map(i => `<li>${escapeHtml(FOODS[i.food].name)} — ${escapeHtml(formatServing(i.food, i.grams))}</li>`).join("")}</ul>
         </div>
         <div>
           <strong>Instructions</strong>
-          <ol>${b.instructions.map(s => `<li>${s}</li>`).join("")}</ol>
+          <ol>${b.instructions.map(s => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
         </div>
       </div>
       <p class="booklet-meal-macros">${PREP_STORAGE_NOTE}</p>
@@ -1589,7 +2848,10 @@ function renderWeekOverview(plan) {
   const rows = plan.map(day => `
     <div class="week-overview-row">
       <button type="button" class="week-overview-daylabel" data-day="${day.day}">Day ${day.day}</button>
-      ${day.meals.map(m => `<button type="button" class="week-overview-cell" data-day="${day.day}" title="${m.name}">${m.name}</button>`).join("")}
+      ${day.meals.map(m => {
+        const label = m.unmatched ? "⚠️ None" : m.name;
+        return `<button type="button" class="week-overview-cell ${m.unmatched ? "week-overview-cell-unmatched" : ""}" data-day="${day.day}" title="${escapeHtml(m.unmatched ? (m.unmatchedReason || "No matching recipe") : m.name)}">${escapeHtml(label)}</button>`;
+      }).join("")}
     </div>`).join("");
 
   return `<div class="week-overview-grid" style="--week-cols: ${headers.length}">${headerRow}${rows}</div>`;
@@ -1798,8 +3060,18 @@ function init() {
   seedSignatureFields(loadPreferences());
   applyPriceOverrides();
 
+  // Import validation keeps bad values out of storage, but startup is the
+  // one place a bad value would take down every later load — so restoring
+  // saved settings/plan is guarded. On failure the stored value is left
+  // alone (not deleted) and the app just starts as if there were none.
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) writeSettingsToForm(JSON.parse(saved));
+  if (saved) {
+    try {
+      writeSettingsToForm(JSON.parse(saved));
+    } catch (err) {
+      console.error("BiteBudget: couldn't restore saved settings; using defaults.", err);
+    }
+  }
 
   applyBudgetSliderRange("#budgetAmountSlider", "#budgetAmount", $("#budgetPeriod").value, Number($("#servings").value) || 1);
   syncSlider("#calories", "#caloriesSlider");
@@ -1809,9 +3081,18 @@ function init() {
   });
 
   const savedPlan = localStorage.getItem(PLAN_KEY);
-  if (savedPlan) renderPlan(recomputeAllCosts(JSON.parse(savedPlan), loadPantry()));
-  else renderProgressStrip();
-  activeSection = savedPlan ? "week" : "settings";
+  let restoredPlan = false;
+  if (savedPlan) {
+    try {
+      renderPlan(recomputeAllCosts(JSON.parse(savedPlan), loadPantry()));
+      restoredPlan = true;
+    } catch (err) {
+      console.error("BiteBudget: couldn't restore the saved plan; starting without it.", err);
+      currentPlanResult = null;
+    }
+  }
+  if (!restoredPlan) renderProgressStrip();
+  activeSection = restoredPlan ? "week" : "settings";
   showSection(activeSection);
 
   document.querySelectorAll(".app-nav-btn").forEach(btn => {
@@ -1827,7 +3108,7 @@ function init() {
   wireBubbleGroup($("#recipeProteinFilter"), "single");
   ["#recipeSlotFilter", "#recipeProteinFilter"].forEach(sel => $(sel).addEventListener("click", renderRecipeBook));
   $("#recipeSearch").addEventListener("input", renderRecipeBook);
-  ["#recipeVegOnly", "#recipeGlutenFree", "#recipeDairyFree"].forEach(sel => $(sel).addEventListener("change", renderRecipeBook));
+  ["#recipeVegOnly", "#recipeGlutenFree", "#recipeDairyFree", "#recipeFavoritesOnly"].forEach(sel => $(sel).addEventListener("change", renderRecipeBook));
   $("#recipeBookList").addEventListener("click", (e) => {
     const favoriteBtn = e.target.closest(".favorite-btn");
     if (favoriteBtn) {
@@ -1848,8 +3129,11 @@ function init() {
     const viewBtn = e.target.closest(".recipe-book-view-btn");
     if (viewBtn) {
       const t = MEAL_TEMPLATES.find(x => x.id === viewBtn.dataset.templateId);
-      if (t) openRecipeModal({ ...t, nutrition: computeNutrition(t.items) });
+      if (t) openRecipeModal({ ...t, nutrition: computeNutrition(servingItems(t)), yieldServings: templateYield(t) });
+      return;
     }
+    const addBtn = e.target.closest(".recipe-book-add-btn");
+    if (addBtn) openAddToPlanDialog(addBtn.dataset.templateId);
   });
   renderRecipeBook();
 
@@ -1870,30 +3154,116 @@ function init() {
     if (rows.length > 1) removeBtn.closest(".custom-recipe-ingredient-row").remove();
     updateCustomRecipeNutritionPreview();
   });
-  $("#customRecipeIngredients").addEventListener("input", updateCustomRecipeNutritionPreview);
-  $("#customRecipeIngredients").addEventListener("change", updateCustomRecipeNutritionPreview);
+  $("#customRecipeIngredients").addEventListener("input", (e) => {
+    const row = e.target.closest(".custom-recipe-ingredient-row");
+    if (row && e.target.matches(".custom-recipe-grams-input")) syncRowGramsFromQty(row);
+    updateCustomRecipeNutritionPreview();
+  });
+  $("#customRecipeIngredients").addEventListener("change", (e) => {
+    const row = e.target.closest(".custom-recipe-ingredient-row");
+    if (row && e.target.matches(".custom-recipe-unit-select")) showRowGramsInUnit(row);
+    if (row && e.target.matches(".custom-recipe-food-select")) resetRowUnits(row);
+    updateCustomRecipeNutritionPreview();
+  });
+  $("#customRecipeYield").addEventListener("input", updateCustomRecipeNutritionPreview);
+  $("#customRecipeSourceUrl").addEventListener("input", refreshCustomRecipeLink);
+  $("#customRecipeSourceImage").addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      setCustomRecipeImage(await compressImageFile(file));
+      $("#customRecipeError").classList.add("hidden");
+    } catch {
+      $("#customRecipeError").textContent = "Couldn't read that image. Try a PNG or JPEG screenshot.";
+      $("#customRecipeError").classList.remove("hidden");
+      e.target.value = "";
+    }
+  });
+  $("#customRecipeImageRemove").addEventListener("click", () => {
+    setCustomRecipeImage(null);
+    $("#customRecipeSourceImage").value = "";
+  });
+  $("#customRecipeParseBtn").addEventListener("click", () => {
+    const note = $("#customRecipeParseNote");
+    const text = $("#customRecipeSourceText").value;
+    const res = parseRecipeText(text);
+    const filled = [];
+    if (res.title && !$("#customRecipeName").value.trim()) { $("#customRecipeName").value = res.title; filled.push("title"); }
+    if (res.yieldServings && readCustomRecipeYield() === null) { $("#customRecipeYield").value = res.yieldServings; filled.push(`servings (${res.yieldServings})`); }
+    let kept = false;
+    if (res.items.length) {
+      if (readCustomRecipeIngredients().length === 0) {
+        $("#customRecipeIngredients").innerHTML = res.items.map(i => customRecipeIngredientRowHTML(i.food, i.grams)).join("");
+        filled.push(`${res.items.length} ingredient${res.items.length === 1 ? "" : "s"}`);
+      } else kept = true;
+    }
+    if (res.instructions.length && !$("#customRecipeInstructions").value.trim()) {
+      $("#customRecipeInstructions").value = res.instructions.join("\n");
+      filled.push(`${res.instructions.length} step${res.instructions.length === 1 ? "" : "s"}`);
+    }
+    customRecipeExtra.unmatched = res.unmatched;
+    renderCustomRecipeUnmatched();
+    updateCustomRecipeNutritionPreview();
+    note.textContent = filled.length || res.unmatched.length
+      ? `${filled.length ? `Filled in: ${filled.join(", ")}. ` : ""}${res.unmatched.length ? `${res.unmatched.length} line${res.unmatched.length === 1 ? "" : "s"} couldn't be matched to a food with a known amount — listed below for you to add. ` : ""}${kept ? "Your existing ingredients were kept. " : ""}Check everything before saving — nothing is final until you tap Save Recipe.`
+      : "Nothing in that text could be read reliably, so nothing was filled in. The text stays saved with the recipe for you to work from.";
+    note.classList.remove("hidden");
+  });
+
   $("#customRecipeForm").addEventListener("submit", (e) => {
     e.preventDefault();
+    const mode = (e.submitter && e.submitter.dataset.mode) || "complete";
+    const showError = (msg) => { $("#customRecipeError").textContent = msg; $("#customRecipeError").classList.remove("hidden"); };
+
     const items = readCustomRecipeIngredients();
-    if (!items.length) {
-      $("#customRecipeError").classList.remove("hidden");
-      return;
+    const yieldServings = readCustomRecipeYield();
+    const urlRaw = $("#customRecipeSourceUrl").value.trim();
+    const link = urlRaw ? parseRecipeLink(urlRaw) : null;
+    if (urlRaw && !link) return showError("That link doesn't look right — it should be a web address like https://www.instagram.com/…");
+    const text = $("#customRecipeSourceText").value.trim();
+    const image = customRecipeExtra.image;
+    const name = $("#customRecipeName").value.trim() || suggestRecipeTitle({ url: link && link.href, text, hasImage: !!image });
+    if (!name) return showError("Add a title — or a link, pasted text or screenshot, and one will be filled in.");
+    if (mode === "complete" && (!items.length || yieldServings === null)) {
+      const need = [!items.length && "at least one ingredient with a quantity above 0", yieldServings === null && "how many servings it makes"].filter(Boolean);
+      return showError(`To save a finished recipe, add ${need.join(" and ")}. Or tap “Save as Want to make” to keep it as it is.`);
     }
-    const name = $("#customRecipeName").value.trim();
-    if (!name) return;
-    const slot = document.querySelector("#customRecipeSlot .bubble.selected")?.dataset.value || "breakfast";
-    const instructions = $("#customRecipeInstructions").value.split("\n").map(s => s.trim()).filter(Boolean);
-    const id = customRecipeEditingId || `custom-recipe-${Date.now()}`;
-    const recipe = { id, slot, name, items, instructions };
+
+    const existing = customRecipeEditingId ? loadCustomRecipes().find(r => r.id === customRecipeEditingId) : null;
+    const made = $("#customRecipeMade").checked;
+    const source = {};
+    if (link) source.url = link.href;
+    if (text) source.text = text;
+    if (image) source.image = image;
+    const record = orderedRecipeRecord({
+      id: customRecipeEditingId || newRecipeId(),
+      slot: document.querySelector("#customRecipeSlot .bubble.selected")?.dataset.value || "breakfast",
+      name,
+      yieldServings: yieldServings === null ? undefined : yieldServings,
+      items,
+      instructions: $("#customRecipeInstructions").value.split("\n").map(s => s.trim()).filter(Boolean),
+      draft: mode === "draft" ? true : undefined,
+      autoPlan: $("#customRecipeAutoPlan").checked,
+      made: made ? true : undefined,
+      madeAt: made ? (customRecipeExtra.keep.madeAt || Date.now()) : undefined,
+      createdAt: existing ? customRecipeExtra.keep.createdAt : Date.now(),
+      versionOf: customRecipeExtra.keep.versionOf,
+      tweak: customRecipeExtra.keep.tweak,
+      source: Object.keys(source).length ? source : undefined,
+      unmatched: mode === "draft" && customRecipeExtra.unmatched.length ? customRecipeExtra.unmatched : undefined,
+    });
 
     const recipes = loadCustomRecipes();
-    const idx = recipes.findIndex(r => r.id === id);
-    if (idx >= 0) recipes[idx] = recipe; else recipes.push(recipe);
-    saveCustomRecipes(recipes);
+    const idx = recipes.findIndex(r => r.id === record.id);
+    if (idx >= 0) recipes[idx] = record; else recipes.push(record);
+    if (!saveCustomRecipes(recipes)) {
+      return showError("Couldn't save — the browser's storage is full. Remove a saved screenshot or export a backup, then try again.");
+    }
     syncCustomRecipesIntoTemplates();
 
     $("#customRecipeDialog").close();
     renderRecipeBook();
+    showRecipeBookTab("mine");
   });
   $("#customRecipeDeleteBtn").addEventListener("click", () => {
     if (!customRecipeEditingId) return;
@@ -1903,6 +3273,84 @@ function init() {
     syncCustomRecipesIntoTemplates();
     $("#customRecipeDialog").close();
     renderRecipeBook();
+    if (!$("#myRecipesView").classList.contains("hidden")) renderMyRecipes();
+  });
+
+  // ---- Add to Plan dialog
+  $("#addToPlanCloseBtn").addEventListener("click", () => $("#addToPlanDialog").close());
+  $("#addToPlanDialog").addEventListener("click", (e) => {
+    if (e.target === $("#addToPlanDialog")) $("#addToPlanDialog").close();
+  });
+  $("#addToPlanDay").addEventListener("change", fillAddToPlanSlots);
+  $("#addToPlanSlot").addEventListener("change", updateAddToPlanPreview);
+  $("#addToPlanServings").addEventListener("input", updateAddToPlanPreview);
+  $("#addToPlanForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = MEAL_TEMPLATES.find(x => x.id === addToPlanTemplateId);
+    if (!t || !currentPlanResult) return;
+    const dayIndex = Number($("#addToPlanDay").value);
+    const mealIndex = Number($("#addToPlanSlot").value);
+    commitPlanMutation(() => placeRecipeInPlan(currentPlanResult, dayIndex, mealIndex, t, readAddToPlanServings(), loadPantry()));
+    $("#addToPlanDialog").close();
+    showSection("week");
+    activateDay(dayIndex + 1);
+  });
+
+  // ---- Recipe Book tabs + My Recipes view
+  wireWhatCanIMake();
+  $("#recipeBookTabs").addEventListener("click", (e) => {
+    const b = e.target.closest(".bubble");
+    if (b) showRecipeBookTab(b.dataset.value);
+  });
+  wireBubbleGroup($("#myRecipesFilter"), "single");
+  $("#myRecipesFilter").addEventListener("click", renderMyRecipes);
+  $("#newPersonalRecipeBtn").addEventListener("click", () => openCustomRecipeDialog(null));
+  $("#myRecipesList").addEventListener("click", (e) => {
+    const favoriteBtn = e.target.closest(".favorite-btn");
+    if (favoriteBtn) { toggleFavorite(favoriteBtn.dataset.templateId); return; }
+    const btn = e.target.closest("button[data-recipe-id]");
+    if (!btn || btn.disabled) return;
+    const id = btn.dataset.recipeId;
+    const recipe = loadCustomRecipes().find(r => r.id === id);
+    if (!recipe) return;
+    if (btn.classList.contains("my-recipe-edit-btn")) openCustomRecipeDialog(recipe);
+    else if (btn.classList.contains("my-recipe-made-btn")) {
+      updatePersonalRecipe(id, recipe.made ? { made: undefined, madeAt: undefined } : { made: true, madeAt: Date.now() });
+      renderMyRecipes();
+    } else if (btn.classList.contains("my-recipe-add-btn")) openAddToPlanDialog(id);
+    else if (btn.classList.contains("my-recipe-tweaks-btn")) openTweaksDialog(id);
+    else if (btn.classList.contains("my-recipe-view-btn")) {
+      const t = MEAL_TEMPLATES.find(x => x.id === id);
+      if (t) openRecipeModal({ ...t, nutrition: computeNutrition(servingItems(t)), yieldServings: templateYield(t) });
+    }
+  });
+  $("#myRecipesList").addEventListener("change", (e) => {
+    const box = e.target.closest(".my-recipe-autoplan-input");
+    if (box) updatePersonalRecipe(box.dataset.recipeId, { autoPlan: box.checked });
+  });
+
+  // ---- Suggest Tweaks
+  $("#tweaksCloseBtn").addEventListener("click", () => $("#tweaksDialog").close());
+  $("#tweaksDialog").addEventListener("click", (e) => {
+    if (e.target === $("#tweaksDialog")) $("#tweaksDialog").close();
+  });
+  $("#tweaksKinds").addEventListener("click", (e) => {
+    const b = e.target.closest(".bubble");
+    if (!b) return;
+    document.querySelectorAll("#tweaksKinds .bubble").forEach(x => x.classList.toggle("selected", x === b));
+    renderTweaks(b.dataset.value);
+  });
+  $("#tweaksList").addEventListener("click", (e) => {
+    const btn = e.target.closest(".tweak-save-btn");
+    if (!btn) return;
+    const id = saveTweakAsVersion(btn.dataset.kind, Number(btn.dataset.index));
+    if (!id) {
+      $("#tweaksNote").textContent = "Couldn't save the variation — the browser's storage may be full.";
+      $("#tweaksNote").classList.remove("hidden");
+      return;
+    }
+    $("#tweaksDialog").close();
+    showRecipeBookTab("mine");
   });
 
   $("#planForm").addEventListener("submit", (e) => {
@@ -1947,10 +3395,7 @@ function init() {
     if (swapBtn) {
       const dayIndex = Number(swapBtn.dataset.dayIndex);
       const mealIndex = Number(swapBtn.dataset.mealIndex);
-      regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences(), loadPantry());
-      updateLatestHistoryEntry(currentPlanResult.summary);
-      localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
-      renderPlan(currentPlanResult);
+      commitPlanMutation(() => regenerateMeal(currentPlanResult, dayIndex, mealIndex, readSettings(), loadPreferences(), loadPantry()));
       return;
     }
 
@@ -1984,10 +3429,7 @@ function init() {
     if (!currentPlanResult) return;
     const shuffleBtn = e.target.closest(".prep-batch-shuffle-btn");
     if (!shuffleBtn) return;
-    regeneratePrepBatch(currentPlanResult, shuffleBtn.dataset.batchId, readSettings(), loadPreferences(), loadPantry());
-    updateLatestHistoryEntry(currentPlanResult.summary);
-    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
-    renderPlan(currentPlanResult);
+    commitPlanMutation(() => regeneratePrepBatch(currentPlanResult, shuffleBtn.dataset.batchId, readSettings(), loadPreferences(), loadPantry()));
   });
 
   $("#recipeCloseBtn").addEventListener("click", () => $("#recipeModal").close());
@@ -2061,10 +3503,7 @@ function init() {
     }
 
     const rebalance = !wasCustom && !leaveOpen;
-    applyCustomMeal(currentPlanResult, dayIndex, mealIndex, customMeal, readSettings(), loadPreferences(), rebalance, loadPantry());
-    updateLatestHistoryEntry(currentPlanResult.summary);
-    localStorage.setItem(PLAN_KEY, JSON.stringify(currentPlanResult));
-    renderPlan(currentPlanResult);
+    commitPlanMutation(() => applyCustomMeal(currentPlanResult, dayIndex, mealIndex, customMeal, readSettings(), loadPreferences(), rebalance, loadPantry()));
     $("#customMealDialog").close();
   });
 
@@ -2090,13 +3529,22 @@ function init() {
   $("#pantryDialog").addEventListener("click", (e) => {
     if (e.target === $("#pantryDialog")) { $("#pantryDialog").close(); return; }
 
-    const addBtn = e.target.closest(".pantry-add-btn");
-    if (addBtn) {
+    const confirmBtn = e.target.closest(".pantry-confirm-btn");
+    if (confirmBtn) {
+      const row = confirmBtn.closest(".pantry-suggested-row");
+      const amount = Number(row.querySelector(".pantry-confirm-amount").value);
+      if (!(amount > 0)) return;
+      const unitGrams = Number(row.querySelector(".pantry-confirm-unit").selectedOptions[0].dataset.grams) || 1;
+      // The box shows a rounded figure (6 eggs = 10.58 oz); the grams behind
+      // it are kept exactly, and used unless the user typed a new amount.
+      const exact = Number(row.dataset.exactGrams);
+      const grams = row.dataset.exactGrams !== undefined && row.dataset.exactGrams !== "" && Number.isFinite(exact) ? exact : amount * unitGrams;
       const pantry = loadPantry();
-      pantry[addBtn.dataset.food] = (pantry[addBtn.dataset.food] || 0) + Number(addBtn.dataset.grams);
+      pantry[confirmBtn.dataset.food] = (pantry[confirmBtn.dataset.food] || 0) + grams;
       savePantry(pantry);
+      // Confirmed stock is real: the shopping list rebuilds around it.
+      syncPlanWithPantry();
       renderPantryDialog();
-      updatePantryButtonBadge();
       return;
     }
 
@@ -2105,17 +3553,37 @@ function init() {
       const pantry = loadPantry();
       delete pantry[removeBtn.dataset.food];
       savePantry(pantry);
+      syncPlanWithPantry();
       renderPantryDialog();
-      updatePantryButtonBadge();
       return;
     }
 
     if (e.target.closest("#pantryClearBtn")) {
       if (!confirm("Clear your pantry? This removes everything you've added.")) return;
       savePantry({});
+      syncPlanWithPantry();
       renderPantryDialog();
-      updatePantryButtonBadge();
     }
+  });
+  $("#pantrySuggested").addEventListener("input", (e) => {
+    const input = e.target.closest(".pantry-confirm-amount");
+    if (input) delete input.closest(".pantry-suggested-row").dataset.exactGrams;
+  });
+  $("#pantrySuggested").addEventListener("change", (e) => {
+    const sel = e.target.closest(".pantry-confirm-unit");
+    if (!sel) return;
+    // Re-express the amount in the new unit (same physical quantity), keeping
+    // the exact grams separately so rounding in the display never reaches
+    // what gets saved. Never snap back to the projected estimate.
+    const row = sel.closest(".pantry-suggested-row");
+    const input = row.querySelector(".pantry-confirm-amount");
+    const newUnitGrams = Number(sel.selectedOptions[0].dataset.grams) || 1;
+    const oldUnitGrams = Number(row.dataset.unitGrams) || newUnitGrams;
+    if (input.value.trim() !== "" && Number.isFinite(Number(input.value))) {
+      if (row.dataset.exactGrams === undefined) row.dataset.exactGrams = String(Number(input.value) * oldUnitGrams);
+      input.value = Math.round(Number(row.dataset.exactGrams) / newUnitGrams * 100) / 100;
+    }
+    row.dataset.unitGrams = String(newUnitGrams);
   });
   $("#pantryItems").addEventListener("change", (e) => {
     const input = e.target.closest(".pantry-row-input");
@@ -2124,8 +3592,8 @@ function init() {
     const grams = Math.max(0, Number(input.value) || 0);
     if (grams <= 0) delete pantry[input.dataset.food]; else pantry[input.dataset.food] = grams;
     savePantry(pantry);
+    syncPlanWithPantry();
     renderPantryDialog();
-    updatePantryButtonBadge();
   });
 
   $("#planNudge").addEventListener("click", (e) => {
@@ -2240,11 +3708,38 @@ function init() {
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text());
-      if (!parsed || typeof parsed.data !== "object") throw new Error("Not a BiteBudget backup file.");
-      if (!confirm("Import this backup? This replaces your current settings, preferences, favorites, and history.")) return;
-      Object.entries(parsed.data).forEach(([k, v]) => {
-        if (k.startsWith("biteBudget.")) localStorage.setItem(k, v);
-      });
+      if (!isPlainObject(parsed) || !isPlainObject(parsed.data)) throw new Error("Not a BiteBudget backup file.");
+
+      // Only keys with a validator are ever considered — anything else in
+      // the file is ignored outright. Each value is validated and rebuilt
+      // (see IMPORT_VALIDATORS); a value that fails is skipped and the
+      // current one for that key is left exactly as it was.
+      const entries = Object.entries(parsed.data).filter(([k]) => hasOwn(IMPORT_VALIDATORS, k));
+      if (entries.length === 0) throw new Error("Not a BiteBudget backup file.");
+
+      const toWrite = {};
+      const rejected = [];
+      let dropped = 0;
+      for (const [k, v] of entries) {
+        const result = typeof v === "string" ? IMPORT_VALIDATORS[k](v) : null;
+        if (!result) { rejected.push(IMPORT_LABELS[k]); continue; }
+        toWrite[k] = result.value;
+        dropped += result.dropped;
+      }
+
+      if (Object.keys(toWrite).length === 0) {
+        alert("Nothing in that file could be imported — it doesn't look like a valid BiteBudget export.");
+        return;
+      }
+
+      const notes = [];
+      if (rejected.length) notes.push(`Couldn't import and left unchanged: ${rejected.join(", ")}.`);
+      if (dropped) notes.push(`${dropped} invalid entr${dropped === 1 ? "y was" : "ies were"} skipped.`);
+      const confirmMsg = "Import this backup? This replaces your current settings, preferences, favorites, and history."
+        + (notes.length ? "\n\n" + notes.join("\n") : "");
+      if (!confirm(confirmMsg)) return;
+
+      Object.entries(toWrite).forEach(([k, v]) => localStorage.setItem(k, v));
       location.reload();
     } catch (err) {
       alert("Couldn't read that file — make sure it's a BiteBudget export.");
